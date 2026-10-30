@@ -97,6 +97,14 @@ def test_event_normalizes_process_and_host():
     assert e.host == "api.openai.com"
 
 
+@pytest.mark.parametrize("given,expected", [
+    ("python.exe", "python"), ("Claude.EXE", "claude"), ("Cursor.exe ", "cursor"), ("python3", "python3"),
+    ("node.js", "node.js"), ("tool.exe.exe", "tool.exe"), (".exe", ".exe"), ("  ", None), (None, None),
+])
+def test_process_names_are_normalized_for_windows(given, expected):
+    assert event(process=given).process == expected
+
+
 def test_visibility_is_derived_from_body_text():
     assert event(body_text=None).visibility is Visibility.METADATA_ONLY
     assert event(body_text="").visibility is Visibility.METADATA_ONLY

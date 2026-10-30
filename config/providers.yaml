@@ -1,0 +1,169 @@
+# AI provider catalog (SOT 7.1). Loaded and validated by src/shadowlens/providers/catalog.py.
+#
+# hosts          : suffix matches. "api.openai.com" matches that host and any "x.api.openai.com".
+# host_regex     : full-match regex on the host name (for hosts with a variable part).
+# ports          : local LLM server ports. Used only for loopback/private destinations.
+# ports_need_path_hint : true when the port is ambiguous (8000, 8080, 5000) so the request path
+#                  must also look like an LLM API (one of path_hints).
+# native_key_rules : rule ids whose credentials are normal use for this provider, so they are
+#                  not findings when sent to it (an OpenAI key sent to api.openai.com).
+# sanctioned_default : approved out of the box. Must equal the SHADOWLENS_SANCTIONED default.
+# unverified     : hostname not yet checked against the real service (SOT 15, item 7).
+
+# Exposure multiplier per category, used by scoring (SOT 7.1, 7.5).
+category_exposure:
+  cloud_llm: 1.0
+  ai_app: 1.0
+  model_hub: 1.1
+  local_llm: 0.4
+
+providers:
+  # ---- cloud LLM APIs -------------------------------------------------------
+  - id: openai
+    display_name: OpenAI
+    category: cloud_llm
+    hosts: [api.openai.com]
+    native_key_rules: [SEC_OPENAI_KEY]
+
+  - id: anthropic
+    display_name: Anthropic
+    category: cloud_llm
+    hosts: [api.anthropic.com]
+    native_key_rules: [SEC_ANTHROPIC_KEY]
+
+  - id: google_gemini
+    display_name: Google Gemini API
+    category: cloud_llm
+    hosts: [generativelanguage.googleapis.com]
+    native_key_rules: [SEC_GOOGLE_API_KEY]
+
+  - id: mistral
+    display_name: Mistral
+    category: cloud_llm
+    hosts: [api.mistral.ai]
+
+  - id: cohere
+    display_name: Cohere
+    category: cloud_llm
+    hosts: [api.cohere.com, api.cohere.ai]
+
+  - id: groq
+    display_name: Groq
+    category: cloud_llm
+    hosts: [api.groq.com]
+
+  - id: together
+    display_name: Together AI
+    category: cloud_llm
+    hosts: [api.together.xyz, api.together.ai]
+
+  - id: fireworks
+    display_name: Fireworks AI
+    category: cloud_llm
+    hosts: [api.fireworks.ai]
+
+  - id: featherless
+    display_name: Featherless
+    category: cloud_llm
+    hosts: [api.featherless.ai]
+
+  - id: perplexity
+    display_name: Perplexity
+    category: cloud_llm
+    hosts: [api.perplexity.ai]
+
+  - id: deepseek
+    display_name: DeepSeek
+    category: cloud_llm
+    hosts: [api.deepseek.com]
+
+  - id: xai
+    display_name: xAI
+    category: cloud_llm
+    hosts: [api.x.ai]
+
+  - id: openrouter
+    display_name: OpenRouter
+    category: cloud_llm
+    hosts: [openrouter.ai]
+
+  - id: replicate
+    display_name: Replicate
+    category: cloud_llm
+    hosts: [api.replicate.com]
+
+  - id: azure_openai
+    display_name: Azure OpenAI
+    category: cloud_llm
+    host_regex: '.*\.openai\.azure\.com'
+
+  - id: aws_bedrock
+    display_name: AWS Bedrock
+    category: cloud_llm
+    host_regex: 'bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com'
+
+  # ---- model hub ------------------------------------------------------------
+  - id: huggingface
+    display_name: Hugging Face
+    category: model_hub
+    hosts: [huggingface.co, api-inference.huggingface.co, router.huggingface.co]
+    native_key_rules: [SEC_HF_TOKEN]
+
+  # ---- AI apps and assistants ----------------------------------------------
+  - id: chatgpt_web
+    display_name: ChatGPT (web)
+    category: ai_app
+    hosts: [chatgpt.com, chat.openai.com]
+
+  - id: claude_web
+    display_name: Claude (web)
+    category: ai_app
+    hosts: [claude.ai]
+
+  - id: gemini_web
+    display_name: Gemini (web)
+    category: ai_app
+    hosts: [gemini.google.com]
+
+  - id: copilot
+    display_name: Microsoft / GitHub Copilot
+    category: ai_app
+    hosts: [copilot.microsoft.com, api.githubcopilot.com]
+
+  - id: cursor
+    display_name: Cursor
+    category: ai_app
+    hosts: [cursor.sh]
+    unverified: true
+
+  - id: poe
+    display_name: Poe
+    category: ai_app
+    hosts: [poe.com]
+    unverified: true
+
+  - id: character_ai
+    display_name: Character.AI
+    category: ai_app
+    hosts: [character.ai]
+    unverified: true
+
+  # ---- local LLM servers ----------------------------------------------------
+  - id: ollama
+    display_name: Ollama
+    category: local_llm
+    ports: [11434]
+    path_hints: [/api/generate, /api/chat, /api/tags]
+    sanctioned_default: true        # via SHADOWLENS_SANCTIONED
+
+  - id: lmstudio
+    display_name: LM Studio
+    category: local_llm
+    ports: [1234]
+
+  - id: local_openai_compatible
+    display_name: Local OpenAI-compatible server
+    category: local_llm
+    ports: [8000, 8080, 5000]       # llama.cpp, vLLM, LocalAI, text-generation-webui
+    ports_need_path_hint: true
+    path_hints: [/v1/chat/completions, /completion, /v1/completions, /api/v1/generate]
