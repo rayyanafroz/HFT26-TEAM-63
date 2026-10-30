@@ -10,6 +10,7 @@ from shadowlens.db import Database
 
 
 def make_config(tmp_path, **env):
+    env = {"SHADOWLENS_RESOLVE": "false", **env}          # tests never make DNS lookups
     return Config.load(env=env, base_dir=tmp_path, use_dotenv=False)
 
 

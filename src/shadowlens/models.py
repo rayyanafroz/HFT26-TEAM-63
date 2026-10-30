@@ -245,8 +245,15 @@ class NetEvent(ShadowModel):
 
     @field_validator("process")
     @classmethod
-    def _lower_process(cls, value: str | None) -> str | None:
-        return value.strip().lower() if value is not None else None
+    def _normalize_process(cls, value: str | None) -> str | None:
+        """Lowercase, and drop a trailing ``.exe`` so Windows names match everywhere
+        (``Claude.EXE`` becomes ``claude``, SOT 1.2)."""
+        if value is None:
+            return None
+        name = value.strip().lower()
+        if name.endswith(".exe") and len(name) > 4:
+            name = name[:-4]
+        return name or None
 
     @field_validator("host")
     @classmethod
@@ -259,7 +266,12 @@ class NetEvent(ShadowModel):
     @field_validator("dst_ip")
     @classmethod
     def _valid_ip(cls, value: str) -> str:
-        ipaddress.ip_address(value)  # raises ValueError for anything that is not an IP
+        try:
+            ipaddress.ip_address(value)
+        except ValueError:
+            # The standard message repeats the value, and a bad value in a log can be anything
+            # (even a secret). Never echo it.
+            raise ValueError("not a valid IP address") from None
         return value
 
     @field_validator("path")

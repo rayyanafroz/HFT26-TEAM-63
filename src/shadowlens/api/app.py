@@ -19,9 +19,14 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..config import Config
+from ..core.ctx import AgentContexts
+from ..core.pipeline import AnalyzeFn, Pipeline
 from ..db import Database, open_database
 from ..models import ErrorResponse
-from . import routes_system
+from ..providers.catalog import Catalog
+from ..providers.resolver import Resolver
+from . import routes_ingest, routes_stream, routes_system
+from .sse import EventBus
 
 log = logging.getLogger("shadowlens.api")
 
@@ -46,18 +51,35 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse(ErrorResponse(error=message).model_dump(), status_code=status)
 
 
+def _default_analyzer() -> AnalyzeFn | None:
+    """The real analyzer once ``shadowlens.analysis.analyze`` exists; until then the pipeline uses a stub."""
+    from .. import analysis
+    return getattr(analysis, "analyze", None)
+
+
 def create_app(
     config: Config | None = None,
     db: Database | None = None,
     ui_dir: Path | None = None,
+    *,
+    bus: EventBus | None = None,
+    catalog: Catalog | None = None,
+    resolver: Resolver | None = None,
+    pipeline: Pipeline | None = None,
+    analyze: AnalyzeFn | None = None,
 ) -> FastAPI:
     """Build the application.
 
-    ``db`` can be passed in (tests do); otherwise the app opens the database at
-    ``config.db_path`` when it starts and closes it when it stops.
+    Everything can be passed in (tests do). Otherwise the app builds what it needs when it
+    starts: it opens the database at ``config.db_path``, starts the host-name resolver
+    (unless ``SHADOWLENS_RESOLVE=false``) and creates the ingest pipeline; when it stops it
+    closes them in the reverse order.
     """
     config = config or Config.load()
     ui_path = Path(ui_dir) if ui_dir is not None else DEFAULT_UI_DIR
+    bus = bus or EventBus()
+    catalog = catalog or Catalog.load()
+    resolver = resolver if resolver is not None else Resolver(catalog, enabled=config.resolve)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -65,9 +87,18 @@ def create_app(
         if owns_db:
             config.ensure_dirs()
             app.state.db = open_database(config)
+        owns_pipeline = pipeline is None
+        app.state.pipeline = pipeline or Pipeline(
+            config, app.state.db, catalog, resolver=resolver, contexts=AgentContexts(),
+            analyze=analyze or _default_analyzer(), publish=bus.publish)
+        resolver.start()
         try:
             yield
         finally:
+            resolver.stop()
+            bus.close()
+            if owns_pipeline:
+                app.state.pipeline = None
             if owns_db:
                 app.state.db.close()
                 app.state.db = None
@@ -76,6 +107,10 @@ def create_app(
                   docs_url=None, redoc_url=None, openapi_url=None)
     app.state.config = config
     app.state.db = db
+    app.state.bus = bus
+    app.state.catalog = catalog
+    app.state.resolver = resolver
+    app.state.pipeline = pipeline
 
     # ---- errors: always {"error": "..."} ---------------------------------
     @app.exception_handler(StarletteHTTPException)
@@ -96,6 +131,8 @@ def create_app(
 
     # ---- API routes ------------------------------------------------------
     app.include_router(routes_system.router)
+    app.include_router(routes_ingest.router)
+    app.include_router(routes_stream.router)
 
     # ---- dashboard files (must be added last: "/" would swallow routes) ---
     if (ui_path / "index.html").is_file():

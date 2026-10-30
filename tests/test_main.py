@@ -19,7 +19,8 @@ def free_port():
 
 
 def make_config(tmp_path, port, **env):
-    env = {"SHADOWLENS_PORT": str(port), "SHADOWLENS_DB_PATH": str(tmp_path / "shadow.db"), **env}
+    env = {"SHADOWLENS_PORT": str(port), "SHADOWLENS_DB_PATH": str(tmp_path / "shadow.db"),
+           "SHADOWLENS_RESOLVE": "false", **env}          # tests never make DNS lookups
     return Config.load(env=env, base_dir=tmp_path, use_dotenv=False)
 
 

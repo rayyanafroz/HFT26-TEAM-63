@@ -52,8 +52,11 @@ def port_in_use(host: str, port: int) -> bool:
 
 def start_server(app, config: Config) -> tuple[uvicorn.Server, threading.Thread]:
     """Run uvicorn in a background thread (the main thread is kept for the window)."""
+    # timeout_graceful_shutdown: an open dashboard tab holds a live-stream connection; without a
+    # limit, stopping the server would wait for it forever.
     server = uvicorn.Server(uvicorn.Config(
-        app, host=config.host, port=config.port, log_level="info", access_log=False))
+        app, host=config.host, port=config.port, log_level="info", access_log=False,
+        timeout_graceful_shutdown=2))
     thread = threading.Thread(target=server.run, name="shadowlens-server", daemon=True)
     thread.start()
     return server, thread
