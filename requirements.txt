@@ -1,0 +1,17 @@
+# Runtime dependencies (top-level, pinned). Installed with:
+#   .venv\Scripts\python -m pip install -r requirements.txt
+fastapi==0.162.0
+uvicorn==0.54.0
+pydantic==2.14.2
+PyYAML==6.0.3
+psutil==7.2.2
+httpx==0.28.1
+python-multipart==0.0.32
+pywebview==6.2.1
+dpkt==1.9.8
+
+# Tests
+pytest==9.2.0
+
+# Install this project itself (src/shadowlens) so `python -m shadowlens` works.
+-e .

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# Local secrets and runtime data (never commit)
+.env
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Offline install cache (kept outside git)
+wheelhouse/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

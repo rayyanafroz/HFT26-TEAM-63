@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shadowlens"
+version = "0.1.0"
+description = "Local, passive AI shadow-IT and agentic data-exfiltration scanner"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+# Dependencies live in requirements.txt (single place to pin them).
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
