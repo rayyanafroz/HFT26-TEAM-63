@@ -194,11 +194,11 @@ def test_a_low_confidence_guess_is_stored_but_creates_nothing_else(tmp_path, db)
     calls = []
     resolver = SimpleNamespace(ip_map={"198.51.100.2": "anthropic"})
     pipeline, published = make_pipeline(tmp_path, db, analyze=analyzer(mk_finding(), calls=calls), resolver=resolver)
-    guess = ev(host=None, dst_ip="198.51.100.2", process="claude", body="has a body")
+    guess = ev(host=None, dst_ip="198.51.100.2", process="somescript", body="has a body")
     summary = pipeline.ingest([guess], source="conn_scan")
     assert (summary.accepted, summary.findings, summary.alerts) == (1, 0, 0)
     assert calls == [] and db.count_findings() == 0                         # not even analysed
-    assert db.list_events().items[0].tool_id == "claude|anthropic" and published.kinds() == ["event.new"]
+    assert db.list_events().items[0].tool_id == "somescript|anthropic" and published.kinds() == ["event.new"]
 
 
 # ---- the analyzer ------------------------------------------------------------
@@ -244,6 +244,48 @@ def test_the_same_finding_in_later_events_is_not_counted_again(tmp_path, db):
     assert (a.findings, a.alerts, b.findings, b.alerts) == (1, 1, 0, 0)
     assert db.count_findings() == 1 and len(published.of("alert.new")) == 1
     assert published.of("event.new")[1].finding_count == 0
+
+
+def test_the_same_leak_sent_again_brings_its_alert_back_without_a_second_finding(tmp_path, db, monkeypatch):
+    from shadowlens.core import pipeline as module
+    monkeypatch.setattr(module, "REPEAT_ALERT_GAP_S", 0.0)
+    pipeline, published = make_pipeline(tmp_path, db, analyze=analyzer(mk_finding()), SHADOWLENS_SANCTIONED="openai")
+    first = pipeline.ingest([ev(body="x", n=1)], source="http_log")
+    original = db.list_alerts().items[0]
+    db.ack_alert(original.id)
+    again = pipeline.ingest([ev(body="x", n=2)], source="http_log")
+    assert (first.findings, first.alerts, again.findings, again.alerts) == (1, 1, 0, 0)      # nothing is counted twice
+    assert db.count_findings() == 1 and db.count_open_alerts() == 1
+    refreshed = db.list_alerts().items[0]
+    assert refreshed.id == original.id and refreshed.status.value == "open" and refreshed.acked_at is None
+    assert refreshed.created_at >= original.created_at
+    pushed = published.of("alert.new")
+    assert len(pushed) == 2 and pushed[1].id == original.id                                   # the toast fires again
+
+
+def test_a_burst_of_the_same_leak_is_one_occurrence(tmp_path, db):
+    pipeline, published = make_pipeline(tmp_path, db, analyze=analyzer(mk_finding()), SHADOWLENS_SANCTIONED="openai")
+    pipeline.ingest([ev(body="x", n=i) for i in range(1, 6)], source="http_log")
+    assert len(published.of("alert.new")) == 1
+
+
+def test_a_repeat_does_not_change_the_score(tmp_path, db, monkeypatch):
+    from shadowlens.core import pipeline as module
+    monkeypatch.setattr(module, "REPEAT_ALERT_GAP_S", 0.0)
+    pipeline, _ = make_pipeline(tmp_path, db, analyze=analyzer(mk_finding()), SHADOWLENS_SANCTIONED="openai")
+    pipeline.ingest([ev(body="x", n=1)], source="http_log")
+    before = [f.model_dump() for f in db.list_findings().items]
+    pipeline.ingest([ev(body="x", n=2)], source="http_log")
+    assert [f.model_dump() for f in db.list_findings().items] == before
+
+
+def test_the_once_per_tool_policy_alert_does_not_repeat(tmp_path, db, monkeypatch):
+    from shadowlens.core import pipeline as module
+    monkeypatch.setattr(module, "REPEAT_ALERT_GAP_S", 0.0)
+    pipeline, published = make_pipeline(tmp_path, db, analyze=analyzer())
+    pipeline.ingest([ev(body="x", n=1)], source="http_log")
+    pipeline.ingest([ev(body="x", n=2)], source="http_log")
+    assert [a.rule_id for a in published.of("alert.new")] == ["POLICY_UNSANCTIONED_TOOL"]
 
 
 def test_a_different_value_or_tool_is_a_new_finding(tmp_path, db):

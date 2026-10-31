@@ -7,7 +7,9 @@ Match order, strongest evidence first:
      (``match_basis: port``; ``high`` for dedicated ports such as Ollama's 11434,
      ``medium`` for ambiguous ports that also need an LLM-looking path)
   3. the destination IP in the resolver map  (``match_basis: resolved_ip``,
-     confidence ``low``: shared CDN addresses make this a guess)
+     confidence ``low``: shared CDN addresses make this a guess; ``medium`` when the program is
+     that provider's own client, e.g. ``claude`` talking to Anthropic). Never for a web browser:
+     it talks to every site, so an address alone cannot say it was an AI one.
 
 No match returns ``None``; the caller drops the event and counts it.
 """
@@ -28,6 +30,15 @@ from ..models import (
 from .catalog import Catalog, Provider
 
 _PORT_SUFFIX = re.compile(r":\d+$")
+
+_BROWSER_PREFIXES = ("chrome", "chromium", "brave", "firefox", "msedge", "microsoftedge", "iexplore",
+                     "opera", "vivaldi", "safari", "librewolf", "waterfox", "tor-browser", "webkit")
+
+
+def is_browser(process: str | None) -> bool:
+    """A web browser (or one of its helper processes), judged by program name."""
+    name = (process or "").strip().lower().removesuffix(".exe")
+    return name.startswith(_BROWSER_PREFIXES)
 
 
 def hostname_of(host: str | None) -> str | None:
@@ -135,10 +146,12 @@ def classify(
             return _match(provider, event, confidence, MatchBasis.PORT)
 
     # 3. resolved IP (a guess: shared addresses are common)
-    if resolved_ips:
+    if resolved_ips and not is_browser(event.process):
         provider_id = resolved_ips.get(event.dst_ip)
         provider = catalog.get(provider_id) if provider_id else None
         if provider is not None:
-            return _match(provider, event, MatchConfidence.LOW, MatchBasis.RESOLVED_IP)
+            own_client = (event.process or "").lower() in provider.clients
+            return _match(provider, event, MatchConfidence.MEDIUM if own_client else MatchConfidence.LOW,
+                          MatchBasis.RESOLVED_IP)
 
     return None

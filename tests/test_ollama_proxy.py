@@ -185,7 +185,8 @@ def test_body_over_the_analysis_limit_is_still_forwarded_whole(upstream, events)
     finally:
         instance.stop()
     assert upstream.requests[0]["body"] == body
-    assert events[0].body_text == "x" * 10 and events[0].body_truncated and events[0].body_bytes == 5000
+    assert events[0].body_text == "x" * 5 + "\n" + "x" * 5       # its start and its end
+    assert events[0].body_truncated and events[0].body_bytes == 5000
 
 
 def test_one_client_connection_can_send_several_requests(tap, upstream):
@@ -300,7 +301,7 @@ def test_bad_utf8_body_does_not_break_the_event():
 
 def test_a_truncated_multibyte_character_is_harmless():
     event = build_event("POST", "/x", None, {}, "é".encode("utf-8") * 10, f"{HOST}:11434", "p", None, 5)
-    assert event.body_truncated and event.body_text.startswith("éé")
+    assert event.body_truncated and event.body_text == "é\né"          # 5 bytes: 2 from each end, never half a character
 
 
 # ---- starting and stopping ------------------------------------------------------------------------

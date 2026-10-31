@@ -7,7 +7,15 @@ import re
 from shadowlens.analysis.catalog import Candidate
 from shadowlens.analysis.settings import AnalysisSettings
 
-_MARKER_RE = re.compile(r"(?i)\b(confidential|proprietary|internal use only|do not distribute|trade secret)\b")
+def _spaced(phrase: str) -> str:
+    """The phrase with an optional space or dot between letters, so "C O N F I D E N T I A L" still counts."""
+    words = [r"[ .]?".join(re.escape(ch) for ch in word) for word in phrase.split()]
+    return r"\s+".join(words)
+
+
+_MARKER_RE = re.compile(
+    r"(?i)(?<![A-Za-z])(" + "|".join(_spaced(p) for p in (
+        "confidential", "proprietary", "internal use only", "do not distribute", "trade secret")) + r")(?![A-Za-z])")
 _COPYRIGHT_RE = re.compile(r"(?i)(copyright|©|\(c\))")
 
 _FENCE_RE = re.compile(r"```.*?(?:```|\Z)", re.DOTALL)

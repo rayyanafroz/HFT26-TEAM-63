@@ -1,0 +1,56 @@
+# Places where AI tools keep readable text of what was sent (SOT 7.2.1). Loaded by src/shadowlens/ingest/sources.py.
+#
+# paths           : globs. "~" is the home folder; other relative paths are relative to the project folder.
+# reader          : how to read a line (ingest/transcripts.py).
+# provider_id/host/process : what the events read from this source are attributed to.
+# enabled_default : on when the app starts. Anything that reads a person's own conversations is opt-in.
+# max_files / max_age_h : only the newest files changed within that many hours are read.
+# reads / stores  : the two sentences shown on the Capture screen.
+
+sources:
+  - id: claude_code
+    display_name: Claude Code transcripts
+    kind: transcript
+    paths: ["~/.claude/projects/**/*.jsonl"]
+    reader: claude_code_jsonl
+    provider_id: anthropic
+    host: api.anthropic.com
+    process: claude
+    enabled_default: false
+    reads: Prompts, tool calls and tool results in these files, line by line.
+    stores: Only masked findings.
+
+  - id: demo_transcripts
+    display_name: Demo transcripts
+    kind: transcript
+    paths: ["data/transcripts_demo/*.jsonl"]
+    reader: claude_code_jsonl
+    provider_id: anthropic
+    host: api.anthropic.com
+    process: claude
+    enabled_default: true
+    reads: Session files written by the transcript simulator.
+    stores: Only masked findings.
+
+  - id: live_log
+    display_name: Live log folder
+    kind: live_log
+    paths: ["data/live/*.jsonl"]
+    enabled_default: true
+    reads: Log files written here, one request per line.
+    stores: Only masked findings.
+
+  - id: ollama_proxy
+    display_name: Ollama tap
+    kind: proxy
+    enabled_default: false
+    reads: Requests sent to the tap's address, then forwarded unchanged.
+    stores: Only masked findings.
+
+  - id: browser_history
+    display_name: AI websites open in the browser
+    kind: browser
+    paths: ["Chrome, Edge, Brave, Chromium and Firefox history"]
+    enabled_default: false
+    reads: Page addresses and visit times from a copy of the browser's history, only for known AI sites. Never page titles or what is typed.
+    stores: Only that the site was visited (browser, site, time). The conversation itself is encrypted and cannot be seen.

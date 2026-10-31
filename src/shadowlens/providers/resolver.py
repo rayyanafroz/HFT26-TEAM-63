@@ -8,6 +8,10 @@ Safety rule: an IP is only used if it belongs to EXACTLY ONE provider. Many AI
 services sit behind the same shared (CDN) addresses; guessing between them would
 mislabel traffic. Matches made this way are low confidence anyway ("unconfirmed").
 
+Two refinements, both set in providers.yaml: providers of one vendor (``family``) may share an
+address, which then goes to the family's first provider; and providers with ``ip_match: false``
+(their host names sit on generic shared servers) never get an address at all.
+
 The resolver makes DNS lookups for the catalog's ~28 public host names and
 nothing else (SOT 4.4). Turn it off with ``SHADOWLENS_RESOLVE=false``.
 """
@@ -67,6 +71,8 @@ class Resolver:
         lookup: Lookup = system_lookup,
     ):
         self._hosts = catalog.resolvable_hosts()       # {host name: provider_id}
+        self._by_ip = {p.id for p in catalog.providers if p.ip_match}
+        self._rank = {p.id: (p.family, i) for i, p in enumerate(catalog.providers)}   # catalog order breaks ties
         self.enabled = enabled
         self.interval_s = interval_s
         self.timeout_s = timeout_s
@@ -77,6 +83,15 @@ class Resolver:
         self._last_refresh: float | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._first_pass = threading.Event()            # set once the first lookup round has finished
+
+    def wait_ready(self, timeout: float = LOOKUP_TIMEOUT_S + 1.0) -> bool:
+        """Wait (at most ``timeout`` seconds) for the first lookup round. The connection scan calls this so that
+        connections already open at start-up are not judged before we know any provider's addresses; it would
+        never look at them again. Returns at once when the resolver is off or was never started."""
+        if not self.enabled or self._thread is None:
+            return True
+        return self._first_pass.wait(timeout)
 
     # ---- the answer ------------------------------------------------------
 
@@ -113,11 +128,23 @@ class Resolver:
                     self._host_ips[host] = ips
             owners: dict[str, set[str]] = {}
             for host, ips in self._host_ips.items():
+                if self._hosts[host] not in self._by_ip:
+                    continue
                 for ip in ips:
                     owners.setdefault(ip, set()).add(self._hosts[host])
             self._ip_map = MappingProxyType(
-                {ip: next(iter(providers)) for ip, providers in owners.items() if len(providers) == 1})
+                {ip: owner for ip, providers in owners.items() if (owner := self._owner(providers))})
             self._last_refresh = time.monotonic()
+        self._first_pass.set()
+
+    def _owner(self, providers: set[str]) -> str | None:
+        """The one provider an address belongs to, or None when it is shared between different vendors."""
+        if len(providers) == 1:
+            return next(iter(providers))
+        families = {self._rank[p][0] for p in providers}
+        if len(families) == 1 and None not in families:
+            return min(providers, key=lambda p: self._rank[p][1])
+        return None
 
     def _lookup_all(self) -> dict[str, frozenset[str]]:
         results: dict[str, frozenset[str]] = {}

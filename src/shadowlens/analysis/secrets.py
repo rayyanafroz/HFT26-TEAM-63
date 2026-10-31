@@ -22,7 +22,7 @@ from shadowlens.analysis.settings import AnalysisSettings
 # line breaks that are still JSON-escaped.
 _BREAK = r"(?:\s|\\[rn])"
 PRIVATE_KEY_RE = re.compile(
-    r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----"
+    r"(?i)-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----"
     rf"(?:{_BREAK}+[A-Za-z0-9+/=]{{16,}})*"
     rf"(?:{_BREAK}*-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----)?"
 )
@@ -36,39 +36,91 @@ JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9
 
 NAMED_PATTERNS: dict[str, re.Pattern[str]] = {
     "SEC_PRIVATE_KEY": PRIVATE_KEY_RE,
-    "SEC_AWS_ACCESS_KEY": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
-    "SEC_ANTHROPIC_KEY": re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{20,}"),
-    "SEC_OPENAI_KEY": re.compile(r"\bsk-(?!ant-)(?:(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{20,}|[A-Za-z0-9]{32,})"),
-    "SEC_GITHUB_TOKEN": re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})\b"),
-    "SEC_SLACK_TOKEN": re.compile(r"\bxox[abprs]-[A-Za-z0-9\-]{10,}"),
+    "SEC_AWS_ACCESS_KEY": re.compile(r"(?<![A-Za-z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}(?![A-Za-z0-9])"),
+    "SEC_ANTHROPIC_KEY": re.compile(r"(?<![A-Za-z0-9])sk-ant-[A-Za-z0-9_\-]{20,}"),
+    # A letter or digit in front means it is part of a longer word ("task-..."), but "_" and "=" are fine:
+    # OPENAI_API_KEY_sk-... is still the key. sk-proj-, sk-svcacct-, sk-None-, sk-or-v1-: any short label, then the secret.
+    "SEC_OPENAI_KEY": re.compile(
+        r"(?<![A-Za-z0-9])sk-(?!ant-)(?:[A-Za-z][A-Za-z0-9]{1,11}-(?:[A-Za-z0-9]{1,6}-)?[A-Za-z0-9_\-]{20,}|[A-Za-z0-9]{32,})"),
+    "SEC_GITHUB_TOKEN": re.compile(r"(?<![A-Za-z0-9])(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})(?![A-Za-z0-9])"),
+    "SEC_SLACK_TOKEN": re.compile(
+        r"\bxox[abprs]-[A-Za-z0-9\-]{10,}|(?<![A-Za-z0-9])xapp-\d-[A-Za-z0-9]+-\d+-[A-Za-z0-9]+|https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{16,}"),
     "SEC_GOOGLE_API_KEY": re.compile(r"\bAIza[0-9A-Za-z_\-]{35}(?![0-9A-Za-z_\-])"),
     "SEC_HF_TOKEN": re.compile(r"\bhf_[A-Za-z0-9]{34,}\b"),
     "SEC_STRIPE_KEY": re.compile(r"\b[sr]k_live_[A-Za-z0-9]{24,}\b"),
     "SEC_DB_URL": re.compile(
-        r"\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp)://[^\s:/@]+:[^\s@/]+@[^\s/\"'`<>]+"
+        r"\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|rediss?|amqps?|mssql|sqlserver|oracle|cockroachdb|"
+        r"clickhouse|neo4j|bolt|couchdb)://[^\s:/@]+:[^\s@/]+@[^\s/\"'`<>]+"
     ),
 }
+
+# Tokens with a clear prefix whose vendor has no rule of its own in the frozen catalog (SOT 6.5). They are
+# reported as SEC_GENERIC_ASSIGNMENT, "possible secret".
+VENDOR_PATTERNS: tuple[re.Pattern[str], ...] = tuple(re.compile(p) for p in (
+    r"\bdo[por]_v1_[a-f0-9]{64}\b",                               # DigitalOcean
+    r"\bshp(?:at|ca|pa|ss)_[a-f0-9]{32}\b",                       # Shopify
+    r"\bSG\.[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{16,}",            # SendGrid
+    r"\bnpm_[A-Za-z0-9]{36}\b",                                   # npm
+    r"\bya29\.[A-Za-z0-9_\-]{20,}",                               # Google OAuth access token
+    r"\bSK[0-9a-f]{32}\b",                                        # Twilio API key
+    r"\bkey-[0-9a-f]{32}\b",                                      # Mailgun
+    r"\bpypi-AgEIcHlwaS5vcmc[A-Za-z0-9_\-]{50,}",                  # PyPI
+    r"\b\d{8,10}:AA[A-Za-z0-9_\-]{33}\b",                         # Telegram bot
+    r"\bsq0(?:atp|csp)-[A-Za-z0-9_\-]{22,}",                       # Square
+    r"\bglpat-[A-Za-z0-9_\-]{20}\b",                              # GitLab
+    r"\bgsk_[A-Za-z0-9]{40,}",                                     # Groq
+    r"\br8_[A-Za-z0-9]{36,}",                                      # Replicate
+    r"\bpplx-[A-Za-z0-9]{40,}",                                    # Perplexity
+    r"\bxai-[A-Za-z0-9]{60,}",                                     # xAI
+    r"\bnvapi-[A-Za-z0-9_\-]{40,}",                                # NVIDIA
+    r"\blsv2_(?:pt|sk)_[a-f0-9]{32}_[a-f0-9]{10}\b",               # LangSmith
+    r"\bfw_[A-Za-z0-9]{24,}",                                      # Fireworks
+    r"\b(?:rk|pk)_(?:live|test)_[A-Za-z0-9]{24,}\b",               # Stripe restricted/publishable-looking
+))
 
 # Something every pattern above must contain. If you add a pattern, add its fixed part here too:
 # test_every_named_pattern_passes_the_prefilter checks that this was not forgotten.
 _NAMED_PREFILTER_RE = re.compile(
-    r"-----BEGIN |AKIA|ASIA|sk-|gh[pousr]_|github_pat_|xox[abprs]-|AIza|hf_|[sr]k_live_|eyJ|://|(?i:secret)"
+    r"(?i:-----BEGIN )|AKIA|ASIA|sk-|gh[pousr]_|github_pat_|xox[abprs]-|AIza|hf_|[sr]k_live_|eyJ|://|(?i:secret)"
+    r"|xapp-|do[por]_v1_|shp(?:at|ca|pa|ss)_|SG\.|npm_|ya29\.|SK[0-9a-f]{32}|key-|pypi-|:AA|sq0|glpat-|[rp]k_(?:live|test)_"
+    r"|gsk_|r8_|pplx-|xai-|nvapi-|lsv2_|fw_"
 )
 
 # ---- assignments ----------------------------------------------------------------------------
 # A secret is rarely named just "password": DB_PASSWORD, access_token and JWT_SECRET are the usual
 # shapes, and "\b" cannot see those because "_" counts as a word character. So a name may have any
 # non-letter in front of it, and nothing word-like after it (token_count and tokens stay quiet).
-_PASSWORD_WORDS = r"passwd|password|pwd|passphrase"
-_OTHER_WORDS = r"api[_\-]?key|secret(?:[_\-]?key)?|token|client[_\-]?secret|access[_\-]?key"
+_PASSWORD_WORDS = r"passwd|password|passcode|passphrase|pwd|pass|pw"
+_OTHER_WORDS = (r"api[_\-\s]?key|secret(?:[_\-]?key)?|token|client[_\-]?secret|access[_\-]?key|private[_\-]?key|"
+                r"auth(?:orization)?|account[_\-]?key|credentials?")
 _SEPARATOR = r"[\"'\\]*\s*(?::=|=>|=|:)\s*[\"'\\]*"
-_VALUE = r"([^\s\"'`,;&<>{}()\[\]\\]+)"
+_SAYS = r"\s+(?:is|was|are)\s+[\"'\\]*"                     # "the password is hunter2xyz"
+_VALUE = r"(?P<v>[^\s\"'`,;&<>{}()\[\]\\]+)"
+_NAME_START = r"(?i)(?<![A-Za-z])"
+_NAME_END = r"(?![A-Za-z0-9_\-])"
 GENERIC_RE = re.compile(
-    rf"(?i)(?<![A-Za-z])(?:({_PASSWORD_WORDS})|{_OTHER_WORDS})(?![A-Za-z0-9_\-]){_SEPARATOR}{_VALUE}"
+    rf"{_NAME_START}(?:(?P<pw>{_PASSWORD_WORDS})|{_OTHER_WORDS}){_NAME_END}(?:{_SEPARATOR}|{_SAYS}){_VALUE}"
 )
+# "passwd hunter2xyz", "with the password Xk39...": only password words may be followed by nothing but a space,
+# and the value must then look chosen, not like a word.
+GENERIC_PLAIN_RE = re.compile(rf"{_NAME_START}(?P<pw>{_PASSWORD_WORDS}){_NAME_END}\s+[\"'\\]*{_VALUE}")
+# password = 'my secret phrase 99': a quoted value may hold spaces.
+GENERIC_QUOTED_RE = re.compile(
+    rf"{_NAME_START}(?:(?P<pw>{_PASSWORD_WORDS})|{_OTHER_WORDS}){_NAME_END}\s*(?::=|=>|=|:)\s*([\"'`])(?P<v>[^\"'`\n]{{8,80}})\2"
+)
+# login: admin / Xk39...: a user and a password written as a pair.
+PAIR_RE = re.compile(r"(?i)\b(?:credentials?|creds|login)\s*[:=]\s*[\w.@\-]{1,40}\s*[/|,]\s*(?P<v>\S{8,})")
+BEARER_RE = re.compile(r"(?i)\bbearer\s+(?P<v>[A-Za-z0-9._~+/\-]{20,}=*)")
+# mysql -u root -pSECRET, sshpass -p SECRET: the client programs where a password follows -p.
+CLI_PASSWORD_RE = re.compile(
+    r"(?i)\b(?:mysql|mysqldump|mysqladmin|mariadb|mongo\w*|psql|redis-cli|sqlcmd)\b[^\n]{0,200}\s-p(?P<v>\S{6,})"
+    r"|\bsshpass\s+-p\s*(?P<v2>\S+)"
+)
+# https://user:SECRET@host for the schemes that are not databases (SEC_DB_URL has those).
+URL_CREDENTIALS_RE = re.compile(r"\b[a-z][a-z0-9+.\-]{1,15}://[^\s:/@]+:(?P<v>[^\s@/]{3,})@")
 # accessToken, clientSecret, dbPassword: the same names in camelCase, so this one is case-sensitive.
 GENERIC_CAMEL_RE = re.compile(
-    rf"[a-z0-9](?:(Password|Passwd|Pwd|Passphrase)|Token|Secret|SecretKey|ApiKey|AccessKey)"
+    rf"[a-z0-9](?:(?P<pw>Password|Passwd|Pwd|Passphrase)|Token|Secret|SecretKey|ApiKey|AccessKey)"
     rf"(?![A-Za-z0-9_\-]){_SEPARATOR}{_VALUE}"
 )
 _REFERENCE_RE = re.compile(r"^(?:[A-Za-z_$][\w$]*\.)+[A-Za-z_$][\w$]*$")  # settings.DB_PASSWORD
@@ -170,6 +222,8 @@ def find_named_secrets(text: str) -> list[Candidate]:
     for match in JWT_RE.finditer(text):
         if _jwt_header_has_alg(match.group(0)):
             found.append(Candidate("SEC_JWT", match.start(), match.end(), match.group(0)))
+    for pattern in VENDOR_PATTERNS:
+        found.extend(Candidate("SEC_GENERIC_ASSIGNMENT", m.start(), m.end(), m.group(0)) for m in pattern.finditer(text))
     return found
 
 
@@ -199,13 +253,34 @@ def _is_real_value(value: str, is_password: bool, settings: AnalysisSettings) ->
     return not _reads_as_a_name(value)
 
 
+def _looks_chosen(value: str) -> bool:
+    """A password nobody wrote a label for needs a letter and a digit or symbol, so prose does not count."""
+    return any(c.isalpha() for c in value) and any(not c.isalpha() for c in value)
+
+
 def find_generic_assignments(text: str, settings: AnalysisSettings) -> list[Candidate]:
     found: list[Candidate] = []
+
+    def add(match: re.Match[str], group: str, is_password: bool, extra=lambda value: True) -> None:
+        value = match.group(group)
+        if value and _is_real_value(value, is_password, settings) and extra(value):
+            found.append(Candidate("SEC_GENERIC_ASSIGNMENT", match.start(group), match.end(group), value))
+
     for pattern in (GENERIC_RE, GENERIC_CAMEL_RE):
         for match in pattern.finditer(text):
-            value = match.group(2)
-            if _is_real_value(value, match.group(1) is not None, settings):
-                found.append(Candidate("SEC_GENERIC_ASSIGNMENT", match.start(2), match.end(2), value))
+            add(match, "v", match.group("pw") is not None)
+    for match in GENERIC_PLAIN_RE.finditer(text):
+        add(match, "v", True, _looks_chosen)
+    for match in GENERIC_QUOTED_RE.finditer(text):
+        add(match, "v", match.group("pw") is not None, lambda value: " " in value and _looks_chosen(value))
+    for match in BEARER_RE.finditer(text):
+        add(match, "v", False)
+    for match in PAIR_RE.finditer(text):
+        add(match, "v", True, _looks_chosen)
+    for match in CLI_PASSWORD_RE.finditer(text):
+        add(match, "v" if match.group("v") else "v2", True)
+    for match in URL_CREDENTIALS_RE.finditer(text):
+        add(match, "v", True)
     return found
 
 

@@ -9,6 +9,7 @@ docs/ANALYSIS_INTEGRATION.md):
     shadowlens.analysis.analyze_text(text, settings)     -> findings + redacted_text      (settings = settings_for(config))
     shadowlens.fakes.samples()                           -> {key, pii, agent}              (Leak Lab buttons)
     shadowlens.fakes.expand(text)                        -> text with every {{fake:kind#n}} replaced
+    shadowlens.analysis.engine.is_safe_to_send(text, cfg) -> bool                       (egress guard before an AI call)
 """
 
 from __future__ import annotations
@@ -38,3 +39,8 @@ def placeholder_expander() -> Callable[[str], str] | None:
 
 def samples_function() -> Callable[[], dict[str, str]] | None:
     return _attr("shadowlens.fakes", "samples")
+
+
+def egress_guard() -> Callable[[str, Any], bool] | None:
+    """``is_safe_to_send(text, config)``: False when the text still contains anything a detector recognizes."""
+    return _attr("shadowlens.analysis.engine", "is_safe_to_send")

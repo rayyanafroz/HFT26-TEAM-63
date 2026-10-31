@@ -50,6 +50,7 @@ from .models import (
 SCHEMA_VERSION = 1
 DEFAULT_LIMIT = 100
 MAX_LIMIT = 1000
+MAX_OFFSET = 2**62            # SQLite integers are 64-bit; anything bigger is past the end anyway
 
 # Counter names (rows in the ``counters`` table).
 DROPPED_NON_AI = "dropped_non_ai"
@@ -200,7 +201,7 @@ class DatabaseError(RuntimeError):
 def clamp_page(limit: int | None, offset: int | None) -> tuple[int, int]:
     """Apply the list rules from SOT 6.1: ``limit`` default 100, max 1000; ``offset`` at least 0."""
     lim = DEFAULT_LIMIT if limit is None else max(1, min(int(limit), MAX_LIMIT))
-    off = 0 if offset is None else max(0, int(offset))
+    off = 0 if offset is None else max(0, min(int(offset), MAX_OFFSET))
     return lim, off
 
 
@@ -414,6 +415,15 @@ class Database:
                 [*params, lim, off])
         return Page[Finding](items=[self._finding_from_row(r) for r in rows], total=total)
 
+    def open_finding_refs(self) -> list[tuple[str, str]]:
+        """``(id, rule_id)`` of every finding that is still open: its alert has not been acknowledged, or it never
+        raised one. Used by the compliance view, which must count all of them (lists are capped)."""
+        rows = self._all(
+            """SELECT f.id AS id, f.rule_id AS rule_id FROM findings f
+               LEFT JOIN alerts a ON a.finding_id = f.id
+               WHERE a.status IS NULL OR a.status != 'acked' ORDER BY f.created_at, f.rowid""")
+        return [(r["id"], r["rule_id"]) for r in rows]
+
     def count_findings(self) -> int:
         return self._count("SELECT COUNT(*) FROM findings")
 
@@ -541,6 +551,23 @@ class Database:
             self._run("UPDATE alerts SET status = 'acked', acked_at = ? WHERE id = ? AND status = 'open'",
                       (acked.acked_at, alert_id))
             return acked
+
+    def repeat_alert(self, tool_id: str, rule_id: str, hash12: str, now: str, older_than: str) -> Alert | None:
+        """The same leak was sent again: re-open its alert and move it to the top, as of ``now``.
+
+        There is still one finding and one alert (SOT 6.5, 6.9), so the score does not change. Returns ``None``
+        when there is no alert for that finding, or its alert is newer than ``older_than`` (a burst of identical
+        lines is one occurrence)."""
+        with self.transaction():
+            row = self._one(
+                """SELECT a.id FROM alerts a JOIN findings f ON f.id = a.finding_id
+                   WHERE f.tool_id = ? AND f.rule_id = ? AND f.hash12 = ? AND a.created_at <= ?""",
+                (tool_id, rule_id, hash12, older_than))
+            if row is None:
+                return None
+            self._run("UPDATE alerts SET status = 'open', acked_at = NULL, created_at = ? WHERE id = ?",
+                      (now, row["id"]))
+            return self.get_alert(row["id"])
 
     def count_open_alerts(self) -> int:
         return self._count("SELECT COUNT(*) FROM alerts WHERE status = 'open'")

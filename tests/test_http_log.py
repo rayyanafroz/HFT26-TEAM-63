@@ -95,7 +95,7 @@ def test_body_hash_and_size_cover_the_whole_body():
 def test_long_bodies_are_truncated_but_still_hashed_in_full():
     body = "a" * 100
     e = event_from_record(rec(body=body), max_body_bytes=40)
-    assert e.body_text == "a" * 40 and e.body_bytes == 100 and e.body_truncated is True
+    assert e.body_text == "a" * 20 + "\n" + "a" * 20 and e.body_bytes == 100 and e.body_truncated is True
     assert e.body_sha256 == hashlib.sha256(body.encode()).hexdigest()
     exact = event_from_record(rec(body=body), max_body_bytes=100)
     assert exact.body_truncated is False and len(exact.body_text) == 100
@@ -103,7 +103,7 @@ def test_long_bodies_are_truncated_but_still_hashed_in_full():
 
 def test_truncation_never_splits_a_character():
     e = event_from_record(rec(body="é" * 10), max_body_bytes=5)    # each é is 2 bytes
-    assert e.body_text == "éé" and e.body_bytes == 20 and e.body_truncated is True
+    assert e.body_text == "é\né" and e.body_bytes == 20 and e.body_truncated is True
 
 
 @pytest.mark.parametrize("body", [None, ""])
@@ -376,7 +376,7 @@ def test_har_structure_problems():
 
 def test_har_expansion_and_options():
     r = parse_log(har(har_entry(text="{{fake:email#1}}")), expand=placeholders, source=Source.SCENARIO, max_body_bytes=4)
-    assert r.events[0].body_text == "<ema" and r.events[0].source is Source.SCENARIO
+    assert r.events[0].body_text == "<e\n1>" and r.events[0].source is Source.SCENARIO
 
 
 # ---- the bundled sample (fixtures/sample_http.jsonl) ---------------------------

@@ -1,0 +1,56 @@
+# Compliance mapping (SOT 7.6). Loaded by src/shadowlens/core/compliance.py.
+#
+# A control is "gap" when at least one finding whose rule matches one of its `rules` patterns is still open
+# (its alert has not been acknowledged), and "ok" otherwise. A pattern ending in * matches any rule that
+# starts with the text before it. Frameworks marked [UNVERIFIED] in the SOT are interpretations of the text
+# of those frameworks, which has not been checked against the official documents.
+
+controls:
+  - id: OWASP-LLM01
+    framework: "OWASP Top 10 for LLM Apps 2025"
+    title: "Prompt Injection"
+    rules: ["AGENT_INJECTION_CHAIN"]
+  - id: OWASP-LLM02
+    framework: "OWASP Top 10 for LLM Apps 2025"
+    title: "Sensitive Information Disclosure"
+    rules: ["SEC_*", "PII_*", "CODE_*"]
+  - id: OWASP-LLM03
+    framework: "OWASP Top 10 for LLM Apps 2025"
+    title: "Supply Chain"
+    rules: ["POLICY_*"]
+  - id: OWASP-LLM06
+    framework: "OWASP Top 10 for LLM Apps 2025"
+    title: "Excessive Agency"
+    rules: ["AGENT_*"]
+  - id: NIST-AIRMF-GOVERN-6.1
+    framework: "NIST AI RMF"
+    title: "Third-party AI policies"
+    rules: ["POLICY_UNSANCTIONED_TOOL"]
+  - id: NIST-AIRMF-MANAGE-3.1
+    framework: "NIST AI RMF"
+    title: "Third-party AI risk monitored"
+    rules: ["POLICY_*"]
+  - id: NIST-600-1-PRIVACY
+    framework: "NIST AI 600-1 [UNVERIFIED]"
+    title: "Data Privacy"
+    rules: ["SEC_*", "PII_*"]
+  - id: NIST-600-1-INFOSEC
+    framework: "NIST AI 600-1 [UNVERIFIED]"
+    title: "Information Security"
+    rules: ["AGENT_*", "SEC_*"]
+  - id: GDPR-5-1-f
+    framework: "GDPR [UNVERIFIED]"
+    title: "Integrity and confidentiality (Art. 5(1)(f))"
+    rules: ["SEC_*", "PII_*"]
+  - id: GDPR-32
+    framework: "GDPR [UNVERIFIED]"
+    title: "Security of processing (Art. 32)"
+    rules: ["SEC_*", "PII_*", "AGENT_*"]
+  - id: GDPR-28-44
+    framework: "GDPR [UNVERIFIED]"
+    title: "Processors and transfers (Art. 28, 44)"
+    rules: ["POLICY_UNSANCTIONED_TOOL"]
+  - id: DPDP-8-5
+    framework: "India DPDP Act [UNVERIFIED]"
+    title: "Reasonable security safeguards (s. 8(5))"
+    rules: ["SEC_*", "PII_*"]

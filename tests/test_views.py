@@ -121,7 +121,7 @@ def test_local_models_count_less_because_they_stay_on_the_machine(setup):
 def test_a_guess_is_listed_but_scores_nothing_and_stays_out_of_the_org_score(setup):
     resolver = SimpleNamespace(ip_map={"198.51.100.2": "anthropic"})
     s = setup(analyze=analyzer(leak()), resolver=resolver)
-    s.ingest(ev(host=None, dst_ip="198.51.100.2", process="claude"), ev(host="api.groq.com", process="app"))
+    s.ingest(ev(host=None, dst_ip="198.51.100.2", process="somescript"), ev(host="api.groq.com", process="app"))
     guess = next(t for t in s.insights.tools() if t.provider_id == "anthropic")
     assert (guess.unconfirmed, guess.confidence, guess.risk) == (True, MatchConfidence.LOW, 0)
     org = s.insights.org()
@@ -242,7 +242,7 @@ def test_a_manual_approval_is_reported_as_an_override(setup):
 
 def test_a_provider_seen_only_through_a_guess_is_not_confirmed(setup):
     s = setup(resolver=SimpleNamespace(ip_map={"198.51.100.2": "anthropic"}))
-    s.ingest(ev(host=None, dst_ip="198.51.100.2", process="claude"))
+    s.ingest(ev(host=None, dst_ip="198.51.100.2", process="somescript"))
     row = s.insights.provider("anthropic")
     assert (row.seen, row.confirmed) == (True, False)
 

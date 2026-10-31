@@ -217,8 +217,131 @@ def test_system_lookup_returns_the_addresses_from_getaddrinfo(monkeypatch):
 def test_resolver_map_drives_a_low_confidence_match():
     r = resolver({"api.anthropic.com": ["198.51.100.2"]})
     r.refresh()
-    event = NetEvent(id=new_id(), ts="2026-10-31T10:00:00.000Z", source="conn_scan", process="claude", pid=1,
+    event = NetEvent(id=new_id(), ts="2026-10-31T10:00:00.000Z", source="conn_scan", process="somescript", pid=1,
                      dst_ip="198.51.100.2", dst_port=443, host_basis="port_only")
     match = classify(event, CATALOG, r.ip_map)
     assert (match.tool_id, match.match_basis, match.confidence) == (
-        "claude|anthropic", MatchBasis.RESOLVED_IP, MatchConfidence.LOW)
+        "somescript|anthropic", MatchBasis.RESOLVED_IP, MatchConfidence.LOW)
+
+
+# ---- vendors that share an address, shared servers, browsers, own clients ---------------------------
+
+def _scan_event(process, ip, port=443):
+    return NetEvent(id=new_id(), ts="2026-10-31T10:00:00.000Z", source="conn_scan", process=process, pid=1,
+                    dst_ip=ip, dst_port=port, host_basis="port_only")
+
+
+def test_two_providers_of_one_vendor_may_share_an_address():
+    # api.anthropic.com and claude.ai really do share 160.79.104.10
+    r = resolver({"api.anthropic.com": ["198.51.100.20"], "claude.ai": ["198.51.100.20"]})
+    r.refresh()
+    assert dict(r.ip_map) == {"198.51.100.20": "anthropic"}          # the vendor's first provider, not dropped
+
+
+def test_vendors_sharing_an_address_are_still_dropped():
+    r = resolver({"api.anthropic.com": ["198.51.100.21"], "api.openai.com": ["198.51.100.21"]})
+    r.refresh()
+    assert dict(r.ip_map) == {}
+
+
+def test_providers_on_generic_shared_servers_are_never_matched_by_address():
+    r = resolver({"api.githubcopilot.com": ["198.51.100.30"], "gemini.google.com": ["198.51.100.31"],
+                  "generativelanguage.googleapis.com": ["198.51.100.32"], "huggingface.co": ["198.51.100.33"],
+                  "api.openai.com": ["198.51.100.34"]})
+    r.refresh()
+    assert dict(r.ip_map) == {"198.51.100.34": "openai"}
+    assert classify(_scan_event("python", "198.51.100.30"), CATALOG, r.ip_map) is None
+
+
+@pytest.mark.parametrize("browser", ["brave", "chrome", "chrome.exe", "firefox", "msedge.exe", "Chromium", "vivaldi-bin"])
+def test_a_browser_is_never_matched_by_address_alone(browser):
+    r = resolver({"api.featherless.ai": ["198.51.100.40"]})
+    r.refresh()
+    assert classify(_scan_event(browser, "198.51.100.40"), CATALOG, r.ip_map) is None
+    assert classify(_scan_event("python", "198.51.100.40"), CATALOG, r.ip_map).provider_id == "featherless"
+
+
+def test_a_browser_is_still_recognised_by_host_name():
+    event = NetEvent(id=new_id(), ts="2026-10-31T10:00:00.000Z", source="http_log", process="chrome",
+                     host="api.openai.com", dst_ip="198.51.100.41", dst_port=443, host_basis="host_header")
+    assert classify(event, CATALOG, {}).provider_id == "openai"
+
+
+def test_a_providers_own_client_is_a_confident_match():
+    r = resolver({"api.anthropic.com": ["198.51.100.50"], "claude.ai": ["198.51.100.50"]})
+    r.refresh()
+    own = classify(_scan_event("claude", "198.51.100.50"), CATALOG, r.ip_map)
+    assert (own.tool_id, own.confidence, own.match_basis) == ("claude|anthropic", MatchConfidence.MEDIUM, MatchBasis.RESOLVED_IP)
+    assert classify(_scan_event("claude.exe", "198.51.100.50"), CATALOG, r.ip_map).confidence is MatchConfidence.MEDIUM
+    other = classify(_scan_event("notes", "198.51.100.50"), CATALOG, r.ip_map)
+    assert other.confidence is MatchConfidence.LOW                       # any other program stays a guess
+
+
+def test_the_catalog_fields_are_validated():
+    base = {"id": "x", "display_name": "X", "category": "cloud_llm", "hosts": ["x.example"]}
+    from shadowlens.providers.catalog import Provider
+    assert Provider.model_validate({**base, "clients": [" Claude.EXE ", ""]}).clients == ["claude"]
+    with pytest.raises(Exception):
+        Provider.model_validate({**base, "ip_match": "maybe"})
+
+
+# ---- the scan waits for the first lookup round ------------------------------------------------------
+
+def test_wait_ready_does_not_block_when_the_resolver_is_off_or_never_started():
+    assert resolver({}).wait_ready(0.01) is True                        # never started
+    assert resolver({}, enabled=False).wait_ready(0.01) is True
+
+
+def test_wait_ready_waits_for_the_first_round_then_returns_at_once():
+    gate = threading.Event()
+
+    def slow(host):
+        gate.wait(5)
+        return ["198.51.100.60"]
+
+    r = Resolver(CATALOG, lookup=slow, timeout_s=5)
+    r.start()
+    try:
+        assert r.wait_ready(0.2) is False                               # still looking up
+        gate.set()
+        assert r.wait_ready(5) is True
+        started = time.monotonic()
+        assert r.wait_ready(5) is True and time.monotonic() - started < 0.1
+    finally:
+        gate.set()
+        r.stop()
+
+
+def test_the_scan_waits_for_the_first_lookup_round(tmp_path):
+    """A scan that runs first judges the connections already open before any provider address is known,
+    and the scanner never looks at those again (found with a real Claude Code process)."""
+    import dataclasses
+
+    from fastapi.testclient import TestClient
+
+    from shadowlens.api.app import create_app
+    from shadowlens.config import Config
+    from shadowlens.ingest.conn_scan import ScanResult
+
+    order = []
+
+    def slow_lookup(host):
+        time.sleep(0.4)
+        order.append("lookup done")
+        return ["198.51.100.70"]
+
+    class Scanner:
+        def scan(self):
+            order.append("scan")
+            return ScanResult()
+
+        def forget(self):
+            pass
+
+    config = dataclasses.replace(Config.load(), db_path=tmp_path / "t.db", live_dir=tmp_path / "live", scan_interval_s=5.0)
+    app = create_app(config, resolver=Resolver(CATALOG, lookup=slow_lookup, timeout_s=3), scanner=Scanner())
+    with TestClient(app):
+        deadline = time.monotonic() + 5
+        while "scan" not in order and time.monotonic() < deadline:
+            time.sleep(0.05)
+    assert "scan" in order and order.index("lookup done") < order.index("scan")
