@@ -3,11 +3,12 @@
 For every event:
 
   1. ``classify`` it. Not AI traffic is counted (``dropped_non_ai``) and dropped.
-  2. Store its metadata (never the body, headers or query string).
+  2. Store its metadata (never the body, headers or query string, and with any secret in
+     the path redacted).
   3. A match we are only guessing at (confidence ``low``) stops here: it is shown as
      "unconfirmed" but creates no findings, alerts or score.
   4. If the event has a readable body, run the analyzer (``analyze``: Saleha's module,
-     injected so this file works with a stub until it exists).
+     injected so tests can use a stub).
   5. Add the pipeline's own policy findings (unapproved tool, local model).
   6. Store the findings, one alert for each that matters, and the agent activity.
   7. Tell the live stream (after the database has committed, never before).
@@ -26,6 +27,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 from pydantic import BaseModel
 
+from ..analysis.engine import redact_path
 from ..config import Config
 from ..db import DROPPED_NON_AI, Database
 from ..ingest.http_log import ParseResult
@@ -62,6 +64,7 @@ MAX_ERRORS = 20
 ALERT_MIN_SEVERITY = Severity.MEDIUM          # SOT 7.5: one alert per finding of at least medium
 POLICY_UNSANCTIONED = "POLICY_UNSANCTIONED_TOOL"
 POLICY_LOCAL = "POLICY_LOCAL_LLM"
+PATH_HIDDEN = "[path hidden]"
 
 # A credential in these headers is normal use when it is the provider's own kind of key (SOT 7.1).
 _CREDENTIAL_HEADERS = {LocationField.HEADER_AUTHORIZATION, LocationField.HEADER_X_API_KEY}
@@ -195,8 +198,9 @@ class Pipeline:
         messages: list[tuple[str, BaseModel | dict[str, Any]]] = []
         stored: list[Finding] = []
         alerts: list[Alert] = []
+        storable = self._with_safe_path(event)                   # the analyzer still reads the original
         with self.db.transaction():
-            self.db.insert_event(event, match)
+            self.db.insert_event(storable, match)
             if match.confidence is not MatchConfidence.LOW:     # guesses stay "unconfirmed"
                 result = self._run_analysis(event, match, batch)
                 findings = self._clean(result.findings, event, match)
@@ -212,13 +216,25 @@ class Pipeline:
                         alerts.append(alert)
                         messages.append(("alert.new", alert))
                 self._store_activity(match, result.agent_activity, {f.id for f in stored})
-            messages.insert(0, ("event.new", self._event_lite(event, match, len(stored))))
+            messages.insert(0, ("event.new", self._event_lite(storable, match, len(stored))))
 
         batch.accepted += 1
         batch.findings += len(stored)
         batch.alerts += len(alerts)
         for kind, payload in messages:                           # only after the commit
             self._emit(kind, payload)
+
+    def _with_safe_path(self, event: NetEvent) -> NetEvent:
+        """The event as it may be stored and published (SOT 6.10). This covers every event,
+        including ones the analyzer never sees. If the check fails the path is withheld."""
+        if not event.path:
+            return event
+        try:
+            safe = redact_path(event.path, self.config)
+        except Exception as exc:  # noqa: BLE001 - never store a path we could not check
+            log.warning("could not check a path (%s)", type(exc).__name__)
+            safe = PATH_HIDDEN
+        return event if safe == event.path else event.model_copy(update={"path": safe})
 
     def _run_analysis(self, event: NetEvent, match: ProviderMatch, batch: _Batch) -> AnalysisResult:
         if event.visibility is not Visibility.FULL:              # nothing readable: nothing to analyse (SOT 4.3)

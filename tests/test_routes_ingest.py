@@ -68,9 +68,10 @@ def loaded(client):
 def test_uploading_the_sample_file(client, bus):
     r = upload(client, SAMPLE.read_bytes(), "sample_http.jsonl")
     assert r.status_code == 200
+    # 15 policy findings (13 alerts) plus 18 from the real analyzer (14 alerts).
     assert r.json() == {"source": "http_log", "accepted": 17, "skipped": 0, "dropped_non_ai": 3,
-                        "findings": 15, "alerts": 13, "errors": []}
-    assert bus.sent.count("event.new") == 17 and bus.sent.count("alert.new") == 13
+                        "findings": 33, "alerts": 27, "errors": []}
+    assert bus.sent.count("event.new") == 17 and bus.sent.count("alert.new") == 27
 
 
 def test_bad_lines_are_reported_not_fatal(client):
@@ -183,15 +184,17 @@ def test_bad_event_filters_are_422_json(client, params):
 
 def test_list_findings_and_filters(client, loaded):
     page = client.get("/api/findings").json()
-    assert page["total"] == 15 and set(page["items"][0]) == {
+    assert page["total"] == 33 and set(page["items"][0]) == {
         "id", "event_id", "tool_id", "rule_id", "category", "severity", "confidence", "masked_preview",
         "location", "owasp", "controls", "meta", "created_at"}
     assert client.get("/api/findings", params={"category": "policy"}).json()["total"] == 15
     assert client.get("/api/findings", params={"rule_id": "POLICY_LOCAL_LLM"}).json()["total"] == 2
-    assert client.get("/api/findings", params={"tool_id": "python3|openai"}).json()["total"] == 1
+    # Policy, plus the AWS access key, the AWS secret and the pasted OpenAI key.
+    assert client.get("/api/findings", params={"tool_id": "python3|openai"}).json()["total"] == 4
     event_id = client.get("/api/events", params={"provider_id": "groq"}).json()["items"][0]["id"]
     assert client.get("/api/findings", params={"event_id": event_id}).json()["total"] == 1
-    assert client.get("/api/findings", params={"category": "secret"}).json()["total"] == 0
+    # AWS access and secret, OpenAI, JWT, database URL, Google key.
+    assert client.get("/api/findings", params={"category": "secret"}).json()["total"] == 6
     assert client.get("/api/findings", params={"category": "nonsense"}).status_code == 422
     assert client.get("/api/findings", params={"event_id": "not-a-uuid"}).status_code == 422
 
@@ -200,7 +203,7 @@ def test_list_findings_and_filters(client, loaded):
 
 def test_list_alerts(client, loaded):
     page = client.get("/api/alerts").json()
-    assert page["total"] == 13
+    assert page["total"] == 27
     alert = page["items"][0]
     assert set(alert) == {"id", "finding_id", "tool_id", "provider_id", "rule_id", "severity", "title",
                           "status", "created_at", "acked_at", "finding", "remediation"}
@@ -209,9 +212,9 @@ def test_list_alerts(client, loaded):
 
 def test_alert_filters(client, loaded):
     assert client.get("/api/alerts", params={"severity": "low"}).json()["total"] == 13
-    assert client.get("/api/alerts", params={"severity": "high,critical"}).json()["total"] == 0
-    assert client.get("/api/alerts", params={"severity": "low, medium"}).json()["total"] == 13
-    assert client.get("/api/alerts", params={"status": "open"}).json()["total"] == 13
+    assert client.get("/api/alerts", params={"severity": "high,critical"}).json()["total"] == 13
+    assert client.get("/api/alerts", params={"severity": "low, medium"}).json()["total"] == 14
+    assert client.get("/api/alerts", params={"status": "open"}).json()["total"] == 27
     assert client.get("/api/alerts", params={"status": "acked"}).json()["total"] == 0
     assert client.get("/api/alerts", params={"tool_id": "browser|chatgpt_web"}).json()["total"] == 1
     assert client.get("/api/alerts", params={"rule_id": "POLICY_UNSANCTIONED_TOOL"}).json()["total"] == 13
@@ -232,7 +235,7 @@ def test_acknowledge_an_alert(client, loaded):
     again = client.post(f"/api/alerts/{alert_id}/ack").json()
     assert again["acked_at"] == r.json()["acked_at"]                           # a second ack changes nothing
     assert client.get("/api/alerts", params={"status": "acked"}).json()["total"] == 1
-    assert client.get("/api/alerts", params={"status": "open"}).json()["total"] == 12
+    assert client.get("/api/alerts", params={"status": "open"}).json()["total"] == 26
 
 
 def test_acknowledging_an_unknown_or_malformed_id(client):
