@@ -5,22 +5,25 @@ from __future__ import annotations
 import re
 
 from shadowlens.analysis.catalog import Candidate
+from shadowlens.analysis.settings import AnalysisSettings
 
 _MARKER_RE = re.compile(r"(?i)\b(confidential|proprietary|internal use only|do not distribute|trade secret)\b")
 _COPYRIGHT_RE = re.compile(r"(?i)(copyright|©|\(c\))")
-_MARKER_WINDOW = 200
 
 _FENCE_RE = re.compile(r"```.*?(?:```|\Z)", re.DOTALL)
 _CODE_TOKEN_RE = re.compile(
     r"(?<![\w#])(def|class|import|from|function|const|let|public|private|return|package)\b|(#include)\b"
 )
-_MIN_LINES = 20
-_MIN_DISTINCT_TOKENS = 3
+# English also says "let", "from", "return" and "public". What prose does not have is lines like these.
+_CODE_LINE_RE = re.compile(
+    r"(?:[;{}]\s*$|[)\]]\s*:?\s*$|:\s*$|\w\s*=\s*\S|^\s*(?:#include|import\s|from\s+\S+\s+import\b|def\s+\w+\s*\(|class\s+\w+))",
+    re.MULTILINE,
+)
 
 
-def _find_confidential_marker(text: str) -> Candidate | None:
+def _find_confidential_marker(text: str, settings: AnalysisSettings) -> Candidate | None:
     for match in _MARKER_RE.finditer(text):
-        window = text[max(0, match.start() - _MARKER_WINDOW):match.end() + _MARKER_WINDOW]
+        window = text[max(0, match.start() - settings.marker_window):match.end() + settings.marker_window]
         if _COPYRIGHT_RE.search(window):
             return Candidate("CODE_CONFIDENTIAL_MARKER", match.start(), match.end(), match.group(0).lower())
     return None
@@ -30,22 +33,35 @@ def _distinct_code_tokens(text: str) -> int:
     return len({m.group(1) or m.group(2) for m in _CODE_TOKEN_RE.finditer(text)})
 
 
-def _find_possible_source(text: str, markers: tuple[str, ...]) -> Candidate | None:
-    fences = [m for m in _FENCE_RE.finditer(text)]
+def _shaped_lines(text: str, enough: int) -> int:
+    count = 0
+    for line in text.splitlines():
+        if _CODE_LINE_RE.search(line):
+            count += 1
+            if count >= enough:
+                break
+    return count
+
+
+def _find_possible_source(text: str, settings: AnalysisSettings) -> Candidate | None:
+    fences = list(_FENCE_RE.finditer(text))
     if fences:
         start, end = fences[0].start(), fences[-1].end()
-    elif text.count("\n") + 1 >= _MIN_LINES:
+    elif text.count("\n") + 1 >= settings.code_min_lines:
         start, end = 0, len(text)
+        if _shaped_lines(text, settings.code_min_shaped_lines) < settings.code_min_shaped_lines:
+            return None
     else:
         return None
     region = text[start:end]
-    if _distinct_code_tokens(region) < _MIN_DISTINCT_TOKENS:
+    if _distinct_code_tokens(region) < settings.code_min_distinct_tokens:
         return None
+    markers = settings.internal_markers
     if markers and not any(marker.lower() in text.lower() for marker in markers):
         return None
     return Candidate("CODE_POSSIBLE_SOURCE", start, end, region)
 
 
-def find_code(text: str, markers: tuple[str, ...] = ()) -> list[Candidate]:
-    found = (_find_confidential_marker(text), _find_possible_source(text, markers))
+def find_code(text: str, settings: AnalysisSettings) -> list[Candidate]:
+    found = (_find_confidential_marker(text, settings), _find_possible_source(text, settings))
     return [candidate for candidate in found if candidate is not None]

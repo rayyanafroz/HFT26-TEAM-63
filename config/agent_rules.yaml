@@ -1,5 +1,8 @@
 # Agent behavior rules (SOT 7.4). Rule ids and severities are frozen in SOT 6.5;
 # the patterns here can be tuned. Everything is matched case-insensitively.
+#
+# Keep repeats bounded ({0,400}, not *). A pattern like curl[^|]*\| tries again at every "curl",
+# and took 21 seconds on one 64 KB command before these limits.
 
 # Tool name -> capability (full match on the tool name).
 capabilities:
@@ -10,29 +13,29 @@ capabilities:
 
 dangerous_commands:
   - '\brm\s+-[a-z]*(?:rf|fr)[a-z]*\s+(?:/|~|\$HOME|\*)'
-  - '\b(?:curl|wget)\b[^\n|]*\|\s*(?:sudo\s+)?(?:ba|z)?sh\b'
+  - '\b(?:curl|wget)\b[^\n|]{0,400}\|\s*(?:sudo\s+)?(?:ba|z)?sh\b'
   - '\bchmod\s+(?:-R\s+)?0?777\s+(?:/|~)'
-  - '\b(?:nc|ncat|netcat)\b[^\n]*\s-e\b'
+  - '\b(?:nc|ncat|netcat)\b[^\n]{0,400}\s-e\b'
   - '/dev/tcp/'
   - 'bash\s+-i\s*>&'
-  - '\bbase64\s+(?:-d|--decode)\b[^\n|]*\|\s*(?:ba)?sh\b'
+  - '\bbase64\s+(?:-d|--decode)\b[^\n|]{0,400}\|\s*(?:ba)?sh\b'
   - '\bdd\s+if=\S+\s+of=/dev/(?:sd|nvme|disk)'
   - ':\(\)\s*\{\s*:\|:&\s*\};:'
   - '\b(?:mkfs|shred)\b'
-  - '\b(?:Remove-Item|ri)\b[^\n]*-Recurse[^\n]*-Force'
+  - '\b(?:Remove-Item|ri)\b[^\n]{0,400}-Recurse[^\n]{0,400}-Force'
   - '\b(?:rd|rmdir)\s+/s\b'
   - '\b(?:del|erase)\s+(?:/[fsq]\s*)+'
-  - '\b(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^\n|]*\|\s*(?:iex|Invoke-Expression)\b'
-  - '\b(?:powershell|pwsh)\b[^\n]*\s-(?:enc|encodedcommand)\s'
-  - '\bcertutil\b[^\n]*-urlcache'
+  - '\b(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^\n|]{0,400}\|\s*(?:iex|Invoke-Expression)\b'
+  - '\b(?:powershell|pwsh)\b[^\n]{0,400}\s-(?:enc|encodedcommand)\s'
+  - '\bcertutil\b[^\n]{0,400}-urlcache'
   - '\bformat\s+[A-Za-z]:'
-  - '\breg\s+(?:add|delete)\b[^\n]*\\(?:Run|RunOnce)\b'
+  - '\breg\s+(?:add|delete)\b[^\n]{0,400}\\(?:Run|RunOnce)\b'
 
 egress_commands:
-  - '\b(?:curl|wget)\b[^\n]*(?:\s-d\b|--data|--upload-file|\s-F\b|\s-T\b|-X\s*POST)'
-  - '\b(?:cat|printenv|env)\b[^\n|]*\|\s*(?:curl|wget|nc)\b'
-  - '\b(?:Invoke-WebRequest|iwr|Invoke-RestMethod|irm)\b[^\n]*(?:-Method\s+Post|-Body\b|-InFile\b)'
-  - '\b(?:type|Get-Content|gc|cat)\b[^\n|]*\|\s*(?:curl|iwr|Invoke-WebRequest|nc)\b'
+  - '\b(?:curl|wget)\b[^\n]{0,400}(?:\s-d\b|--data|--upload-file|\s-F\b|\s-T\b|-X\s*POST)'
+  - '\b(?:cat|printenv|env)\b[^\n|]{0,400}\|\s*(?:curl|wget|nc)\b'
+  - '\b(?:Invoke-WebRequest|iwr|Invoke-RestMethod|irm)\b[^\n]{0,400}(?:-Method\s+Post|-Body\b|-InFile\b)'
+  - '\b(?:type|Get-Content|gc|cat)\b[^\n|]{0,400}\|\s*(?:curl|iwr|Invoke-WebRequest|nc)\b'
 
 # A command that reaches the network counts as using the network capability,
 # even when no network tool was declared.
@@ -48,13 +51,13 @@ sensitive_paths:
   - '\.git-credentials\b'
   - '\.npmrc\b'
   - '\.pypirc\b'
-  - 'service[_\-]account[^\s"'']*\.json'
+  - 'service[_\-]account[^\s"'']{0,200}\.json'
   - '(?:%USERPROFILE%|\$env:USERPROFILE|\$HOME)[\\/]\.(?:ssh|aws|gnupg|kube|docker)(?:[\\/]|\b)'
   - '[A-Za-z]:[\\/]Users[\\/][^\\/\s"'']+[\\/]\.(?:ssh|aws|gnupg|kube|docker)(?:[\\/]|\b)'
   - '\bNTUSER\.DAT\b'
   - '[A-Za-z]:[\\/]Windows[\\/]System32[\\/]config[\\/](?:SAM|SYSTEM|SECURITY)\b'
   # Spaces are allowed: Chrome keeps these under "User Data".
-  - 'AppData[\\/](?:Roaming|Local)[\\/][^"''\n]*(?:Credentials|Login Data|Cookies)'
+  - 'AppData[\\/](?:Roaming|Local)[\\/][^"''\n]{0,300}(?:Credentials|Login Data|Cookies)'
 
 # First word of a command that only looks at things (AGENT_SHELL_EXEC drops to medium).
 read_only_commands: [ls, pwd, whoami, date, echo, cat, head, tail, wc, grep, find, dir, type, where, findstr, get-childitem, get-location]

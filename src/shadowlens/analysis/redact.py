@@ -39,7 +39,8 @@ def drop_already_redacted(text: str, candidates: Iterable[Candidate]) -> list[Ca
 def _apply(text: str, findings: Iterable[TextFinding]) -> tuple[str, dict[tuple[int, int], int]]:
     """Replace every span; also return where each original span landed in the result.
 
-    A span inside a larger one (a key inside a redacted code block) disappears with it.
+    A span inside a larger one (a key inside a redacted code block) disappears with it. A span that
+    only partly overlaps the previous one is removed in full too: its tail must not stay visible.
     """
     items = [(start, end, f) for f in findings for start, end in f.spans]
     items.sort(key=lambda item: (item[0], item[0] - item[1]))
@@ -51,6 +52,7 @@ def _apply(text: str, findings: Iterable[TextFinding]) -> tuple[str, dict[tuple[
     for start, end, finding in items:
         if start < cursor:  # inside the previous span
             positions[(start, end)] = outer_start
+            cursor = max(cursor, end)
             continue
         parts.append(text[cursor:start])
         length += start - cursor

@@ -1,0 +1,29 @@
+# Detector tuning (SOT 6.11). Everything here can be changed without touching code.
+#
+# Each value is checked when the app starts. A missing, misspelled or out-of-range value falls
+# back to its default and is reported in the log, so a typo here can never turn detection off.
+# Rule ids and severities are frozen in SOT 6.5 and do not live here.
+
+# ---- SEC_HIGH_ENTROPY -------------------------------------------------------------------
+entropy_alnum: 4.2                     # bits per character needed by a mixed token
+entropy_hex: 3.3                       # the same for a token of only hex digits
+entropy_min_len: 24                    # shorter tokens are never considered
+entropy_length_ratio: 0.88             # short tokens cannot reach entropy_alnum even when random, so
+                                       # the bar is min(entropy_alnum, ratio x log2(length))
+max_entropy_findings_per_event: 3
+entropy_digest_lengths: [32, 40, 64]   # pure hex of these lengths reads as MD5, SHA-1 and SHA-256
+
+# ---- SEC_GENERIC_ASSIGNMENT --------------------------------------------------------------
+generic_min_entropy: 3.0               # "aaaaaaaaaaaa" is not a secret
+generic_min_len: 12                    # api_key=, token=, secret=
+generic_password_min_len: 8            # password=, passwd=, pwd=, passphrase=: real ones are shorter
+generic_placeholder_words: [your_, xxx, changeme, example, "<", "${", "{{"]
+
+# ---- PII_EMAIL ---------------------------------------------------------------------------
+email_skip_domains: [example.com, example.org, test.com, localhost]
+
+# ---- CODE_* ------------------------------------------------------------------------------
+marker_window: 200                     # how close "confidential" must be to a copyright notice
+code_min_lines: 20                     # without a code fence, text must be at least this long...
+code_min_distinct_tokens: 3            # ...use this many different keywords (def, class, import...)
+code_min_shaped_lines: 3               # ...and have this many lines shaped like code, not prose
