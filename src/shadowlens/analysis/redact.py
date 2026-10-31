@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from typing import Iterable
 
 from shadowlens.analysis.catalog import RULES, Candidate, TextFinding
@@ -20,20 +21,40 @@ def resolve_overlaps(candidates: Iterable[Candidate]) -> list[Candidate]:
 
     Within a priority, the order of ``candidates`` decides, then the longer match.
     Result is sorted by position.
+
+    The kept matches never overlap each other, so a new one can only touch its two neighbours by
+    position. That keeps this fast when a hostile text holds thousands of matches.
     """
     indexed = list(enumerate(candidates))
     indexed.sort(key=lambda item: (RULES[item[1].rule_id].priority, item[0], item[1].start - item[1].end))
     kept: list[Candidate] = []
+    starts: list[int] = []
     for _, candidate in indexed:
-        if not any(_overlaps(candidate, other) for other in kept):
-            kept.append(candidate)
+        at = bisect_left(starts, candidate.start)
+        if at > 0 and kept[at - 1].end > candidate.start:
+            continue
+        if at < len(kept) and kept[at].start < candidate.end:
+            continue
+        if at < len(kept) and kept[at].start == candidate.start:       # an empty span at the same place
+            continue
+        kept.insert(at, candidate)
+        starts.insert(at, candidate.start)
     return sorted(kept, key=lambda c: (c.start, c.end))
 
 
 def drop_already_redacted(text: str, candidates: Iterable[Candidate]) -> list[Candidate]:
     """Text that is already a placeholder is not a new hit (the guard depends on this)."""
     spans = [m.span() for m in PLACEHOLDER_RE.finditer(text)]
-    return [c for c in candidates if not any(c.start < end and start < c.end for start, end in spans)]
+    if not spans:
+        return list(candidates)
+    starts = [start for start, _ in spans]
+    kept = []
+    for c in candidates:
+        at = bisect_left(starts, c.end)                  # placeholders that begin before the candidate ends
+        if at > 0 and spans[at - 1][1] > c.start:        # the last of them reaches into the candidate
+            continue
+        kept.append(c)
+    return kept
 
 
 def _apply(text: str, findings: Iterable[TextFinding]) -> tuple[str, dict[tuple[int, int], int]]:

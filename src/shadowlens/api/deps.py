@@ -34,3 +34,7 @@ def get_publisher(request: Request) -> ScorePublisher:
 
 def get_capture(request: Request) -> CaptureManager:
     return request.app.state.capture
+
+
+def get_triage(request: Request):
+    return request.app.state.triage

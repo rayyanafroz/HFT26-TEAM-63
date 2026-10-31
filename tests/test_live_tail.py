@@ -128,7 +128,7 @@ def test_the_body_size_limit_is_applied(live, db):
     tail, sink = make(live, db, max_body_bytes=10)
     append(live / "x.jsonl", line(body="x" * 100) + "\n")
     tail.poll_once()
-    assert sink.events[0].body_truncated and len(sink.events[0].body_text) == 10
+    assert sink.events[0].body_truncated and sink.events[0].body_text == "x" * 5 + "\n" + "x" * 5
 
 
 # ---- files that change under us --------------------------------------------------

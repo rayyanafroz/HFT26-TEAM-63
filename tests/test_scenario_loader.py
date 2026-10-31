@@ -92,7 +92,8 @@ def test_placeholders_and_the_body_limit_are_applied(templates):
     write(templates, "s", [record(0, body="key={{fake:openai_key#1}}" + "x" * 200)])
     expand = lambda t: re.sub(r"\{\{fake:([a-z_]+)#(\d+)\}\}", r"<\1-\2>", t)
     event = build_events("s", play=False, templates_dir=templates, now=NOW, expand=expand, max_body_bytes=30)[0].event
-    assert event.body_text.startswith("key=<openai_key-1>") and event.body_truncated and len(event.body_text) == 30
+    # 30 bytes: 15 from the start, a break, 15 from the end
+    assert event.body_text == "key=<openai_key\n" + "x" * 15 and event.body_truncated
 
 
 # ---- play: spread over time ----------------------------------------------------------------

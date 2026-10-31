@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterable
 
 from ..db import Database
 from ..models import NetEvent, Source
@@ -33,6 +33,10 @@ BATCH_LINES = 200                       # the bookmark moves at least this often
 # What is done with new events: (events, number of bad lines, their error messages)
 Ingest = Callable[[list[NetEvent], int, list[str]], None]
 
+# Turns one line of text into an event. It may return None for a line that is fine but of no interest (not
+# counted as bad), or raise LogLineError for a bad one. Arguments: the line, and the placeholder expander.
+ParseLine = Callable[[str, Expander | None], NetEvent | None]
+
 
 class LiveTail:
     def __init__(
@@ -46,8 +50,16 @@ class LiveTail:
         poll_s: float = POLL_INTERVAL_S,
         max_read: int = MAX_READ_BYTES,
         batch_lines: int = BATCH_LINES,
+        files: Callable[[], Iterable[Path]] | None = None,
+        parse: ParseLine | None = None,
     ):
+        """Normally this watches ``directory/*.jsonl`` for lines in the HTTP log format. The transcript reader
+        reuses it all (partial lines, truncation, bookmarks, batching) by passing its own ``files`` (which files
+        to read) and ``parse`` (what a line means)."""
         self.directory = Path(directory)
+        self._files = files
+        self._parse = parse or (lambda text, expand: parse_jsonl_line(
+            text, source=Source.LIVE_LOG, max_body_bytes=max_body_bytes, expand=expand))
         self._db = db
         self._ingest = ingest
         self._max_body = max_body_bytes
@@ -69,7 +81,7 @@ class LiveTail:
         """Read whatever was added to every ``*.jsonl`` file. Returns how many lines were ingested."""
         with self._lock:
             try:
-                files = sorted(self.directory.glob("*.jsonl"))
+                files = sorted(self._files()) if self._files else sorted(self.directory.glob("*.jsonl"))
             except OSError:
                 return 0
             return sum(self._read_new(path) for path in files)
@@ -135,8 +147,9 @@ class LiveTail:
             in_batch += 1
             if text.strip():
                 try:
-                    events.append(parse_jsonl_line(
-                        text, source=Source.LIVE_LOG, max_body_bytes=self._max_body, expand=self._expand()))
+                    event = self._parse(text, self._expand())
+                    if event is not None:
+                        events.append(event)
                 except LogLineError as exc:
                     skipped += 1
                     if len(errors) < 20:

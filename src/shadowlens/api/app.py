@@ -24,15 +24,20 @@ from ..core.capture import CaptureManager
 from ..core.ctx import AgentContexts
 from ..core.pipeline import AnalyzeFn, Pipeline
 from ..core.scenario_player import ScenarioPlayer
+from ..core.sanction import effective_sanctioned
 from ..core.score_publisher import ScorePublisher
 from ..core.views import Insights
 from ..db import Database, open_database
 from ..ingest.conn_scan import ConnectionScanner
 from ..ingest.live_tail import LiveTail
+from ..ingest.sources import SourceManager
+from ..llm.triage import Triage
 from ..models import ErrorResponse
 from ..providers.catalog import Catalog
 from ..providers.resolver import Resolver
-from . import routes_capture, routes_ingest, routes_insights, routes_stream, routes_system
+from . import (routes_capture, routes_ingest, routes_insights, routes_reports, routes_sources, routes_stream,
+               routes_system, routes_triage)
+from .local_only import LocalOnly
 from .sse import EventBus
 
 log = logging.getLogger("shadowlens.api")
@@ -70,6 +75,7 @@ def create_app(
     analyze: AnalyzeFn | None = None,
     scanner: ConnectionScanner | None = None,
     templates_dir: Path | None = None,
+    sources: SourceManager | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -93,10 +99,20 @@ def create_app(
         insights = Insights(config, app.state.db, catalog)
         publisher = ScorePublisher(insights, bus.publish)
         app.state.insights, app.state.publisher = insights, publisher
+        triage = Triage(
+            config, app.state.db, catalog, publish=bus.publish, check=hooks.egress_guard(),
+            sanctioned=lambda provider_id: effective_sanctioned(config, app.state.db.get_provider_overrides(), provider_id))
+        app.state.triage = triage
+
+        def publish(kind, payload):
+            bus.publish(kind, payload)
+            if kind == "alert.new":
+                triage.on_alert(payload)         # advice for high and critical alerts, in the background
+
         owns_pipeline = pipeline is None
         app.state.pipeline = pipeline or Pipeline(
             config, app.state.db, catalog, resolver=resolver, contexts=AgentContexts(),
-            analyze=analyze or hooks.event_analyzer(), publish=bus.publish, after_batch=publisher.notify)
+            analyze=analyze or hooks.event_analyzer(), publish=publish, after_batch=publisher.notify)
         live_pipeline = app.state.pipeline
         player = ScenarioPlayer(live_pipeline, bus.publish, max_body_bytes=config.max_body_bytes,
                                 expand=hooks.placeholder_expander,
@@ -105,18 +121,28 @@ def create_app(
             config.live_dir, app.state.db,
             lambda events, skipped, errors: live_pipeline.ingest(events, source="live_log", skipped=skipped, errors=errors),
             max_body_bytes=config.max_body_bytes, expand=hooks.placeholder_expander)
-        capture = CaptureManager(config, live_pipeline, scanner or ConnectionScanner(), tail, player)
+        source_manager = sources or SourceManager(
+            config, app.state.db,
+            lambda events, **kw: live_pipeline.ingest(events, **kw),
+            is_ai_host=lambda host: any(p.matches_host(host.lower()) for p in catalog.providers))
+        capture = CaptureManager(config, live_pipeline, scanner or ConnectionScanner(), tail, player,
+                                 sources=source_manager)
+        source_manager.attach_capture(capture)
         app.state.capture = capture
+        app.state.sources = source_manager
         insights.set_scenario_source(lambda: player.name)
         try:
             config.live_dir.mkdir(parents=True, exist_ok=True)
         except OSError:
             pass
+        resolver.start()                 # first: the scan waits for its first round (Resolver.wait_ready)
         capture.start_defaults()
-        resolver.start()
+        source_manager.start()
         try:
             yield
         finally:
+            source_manager.stop()
+            triage.close()
             capture.shutdown()
             resolver.stop()
             publisher.close()
@@ -138,6 +164,9 @@ def create_app(
     app.state.insights = None       # built when the app starts (they need the database)
     app.state.publisher = None
     app.state.capture = None
+    app.state.sources = None
+    app.state.triage = None
+    app.add_middleware(LocalOnly, allowed=[config.host])
 
     # ---- errors: always {"error": "..."} ---------------------------------
     @app.exception_handler(StarletteHTTPException)
@@ -161,7 +190,10 @@ def create_app(
     app.include_router(routes_ingest.router)
     app.include_router(routes_insights.router)
     app.include_router(routes_capture.router)
+    app.include_router(routes_sources.router)
     app.include_router(routes_stream.router)
+    app.include_router(routes_reports.router)
+    app.include_router(routes_triage.router)
 
     # ---- dashboard files (must be added last: "/" would swallow routes) ---
     if (ui_path / "index.html").is_file():

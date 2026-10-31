@@ -24,6 +24,7 @@ import psutil
 import uvicorn
 
 from shadowlens.config import LOOPBACK_HOST
+from shadowlens.ingest.http_log import keep_head_and_tail
 from shadowlens.models import NetEvent, new_id, utc_now_iso
 
 log = logging.getLogger("shadowlens.ollama_proxy")
@@ -65,15 +66,15 @@ def split_upstream(upstream: str) -> tuple[str, int]:
 
 def build_event(method: str, path: str, query: str | None, headers: dict[str, str], body: bytes,
                 upstream: str, process: str, pid: int | None, max_body_bytes: int) -> NetEvent:
-    """Only the first ``max_body_bytes`` are analyzed. The whole body is still forwarded."""
+    """A body over ``max_body_bytes`` is analyzed by its start and its end. The whole body is still forwarded."""
     _, port = split_upstream(upstream)
-    kept = body[:max_body_bytes]
+    text = keep_head_and_tail(body, max_body_bytes) if len(body) > max_body_bytes else body.decode("utf-8", errors="replace")
     return NetEvent(
         id=new_id(), ts=utc_now_iso(), source="proxy", process=process, pid=pid,
         dst_ip=LOOPBACK_HOST, dst_port=port, host=f"localhost:{port}", host_basis="host_header",
         method=method, path=path, query=query or None,
         headers={**headers, "host": f"localhost:{port}"},
-        body_text=kept.decode("utf-8", errors="replace") or None,
+        body_text=text or None,
         body_bytes=len(body), body_sha256=hashlib.sha256(body).hexdigest() if body else None,
         body_truncated=len(body) > max_body_bytes, bytes_out=len(body),
     )
@@ -82,7 +83,7 @@ def build_event(method: str, path: str, query: str | None, headers: dict[str, st
 class TapApp:
     """A plain ASGI app. No framework, so nothing can rewrite a request or a reply on the way."""
 
-    def __init__(self, upstream: str, on_event: OnEvent, max_body_bytes: int = 65536):
+    def __init__(self, upstream: str, on_event: OnEvent, max_body_bytes: int = 262144):
         self.upstream = upstream
         self.on_event = on_event
         self.max_body_bytes = max_body_bytes
@@ -182,7 +183,7 @@ class OllamaTap:
     """Starts and stops the tap on its own thread. A failure is reported in ``error``, never raised."""
 
     def __init__(self, on_event: OnEvent, listen_port: int = 11436, upstream: str = "127.0.0.1:11434",
-                 max_body_bytes: int = 65536):
+                 max_body_bytes: int = 262144):
         self.listen_port = listen_port
         self.upstream = upstream
         self.app = TapApp(upstream, on_event, max_body_bytes)

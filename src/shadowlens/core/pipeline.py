@@ -23,6 +23,7 @@ import hashlib
 import logging
 import threading
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable, Mapping
 
 from pydantic import BaseModel
@@ -62,6 +63,7 @@ log = logging.getLogger("shadowlens.pipeline")
 Publish = Callable[[str, "BaseModel | dict[str, Any]"], None]
 
 MAX_ERRORS = 20
+REPEAT_ALERT_GAP_S = 5.0                     # the same leak sent again within this long is one occurrence
 ALERT_MIN_SEVERITY = Severity.MEDIUM          # SOT 7.5: one alert per finding of at least medium
 POLICY_UNSANCTIONED = "POLICY_UNSANCTIONED_TOOL"
 POLICY_LOCAL = "POLICY_LOCAL_LLM"
@@ -208,7 +210,12 @@ class Pipeline:
                 findings += self._policy_findings(event, match, batch)
                 for finding in findings:
                     if not self.db.insert_finding(finding):
-                        continue                                 # already known for this tool: not counted twice
+                        # Already known for this tool: not counted twice. The person did it again, though, so
+                        # its alert comes back (policy findings are once per tool and stay quiet).
+                        again = self._repeat_alert(finding)
+                        if again is not None:
+                            messages.append(("alert.new", again))
+                        continue
                     stored.append(finding)
                     messages.append(("finding.new", finding))
                     alert = self._alert_for(finding, match)
@@ -286,6 +293,14 @@ class Pipeline:
             meta=FindingMeta(hash12=hashlib.sha256(f"{rule_id}|{match.tool_id}".encode()).hexdigest()[:12],
                              context=f"{event.process or 'unknown'} -> {match.display_name}"),
             created_at=utc_now_iso())
+
+    def _repeat_alert(self, finding: Finding) -> Alert | None:
+        if finding.category is FindingCategory.POLICY:
+            return None
+        now = datetime.now(timezone.utc)
+        stamp = lambda moment: moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}Z"
+        return self.db.repeat_alert(finding.tool_id, finding.rule_id, finding.meta.hash12, stamp(now),
+                                    stamp(now - timedelta(seconds=REPEAT_ALERT_GAP_S)))
 
     @staticmethod
     def _alert_for(finding: Finding, match: ProviderMatch) -> Alert | None:

@@ -6,58 +6,179 @@
 
 # Tool name -> capability (full match on the tool name).
 capabilities:
-  shell: '(?:bash|sh|zsh|shell|terminal|powershell|pwsh|cmd(?:_?exe)?|run_?(?:shell|command|terminal(?:_cmd)?|code)|exec(?:ute)?(?:_?command)?|subprocess|python_?repl)'
-  fs_read: '(?:read(?:_?file)?|cat|view(?:_?file)?|open(?:_?file)?|list_?(?:dir(?:ectory)?|files)|ls|glob|grep|find|search_?files|get_?file(?:_contents)?|str_?replace(?:_?editor|_based_edit_tool))'
+  shell: '(?:.*[_\-.\s])?(?:bash|sh|zsh|shell|terminal|powershell|pwsh|cmd|command|exec|execute|subprocess|repl|interpreter)(?:[_\-.\s].*)?'
+  fs_read: '(?:read(?:_?file)?|cat|view(?:_?file)?|open(?:_?file)?|list_?(?:dir(?:ectory)?|files)|ls|glob|grep|find|search_?files|get_?file(?:_contents)?|str_?replace(?:_?editor|_based_edit_tool)|(?:.*[_\-.\s])?(?:read|reader|view|cat|open)(?:[_\-.\s].*)?)'
   fs_write: '(?:write(?:_?file)?|edit(?:_?file)?|multi_?edit|notebook_?edit|create_?file|str_?replace(?:_?editor|_based_edit_tool)?|apply_?patch|delete_?file|rm|mkdir|move_?file)'
   network: '(?:fetch|http_?request|web_?fetch|web_?search|browse|curl|download|post_?request|send_?request)'
 
 dangerous_commands:
-  - '\brm\s+-[a-z]*(?:rf|fr)[a-z]*\s+(?:/|~|\$HOME|\*)'
-  - '\b(?:curl|wget)\b[^\n|]{0,400}\|\s*(?:sudo\s+)?(?:ba|z)?sh\b'
-  - '\bchmod\s+(?:-R\s+)?0?777\s+(?:/|~)'
-  - '\b(?:nc|ncat|netcat)\b[^\n]{0,400}\s-e\b'
-  - '/dev/tcp/'
-  - 'bash\s+-i\s*>&'
-  - '\bbase64\s+(?:-d|--decode)\b[^\n|]{0,400}\|\s*(?:ba)?sh\b'
+  # ---- deleting things -----------------------------------------------------------------------------------------
+  - '\brm\s+-[a-z]*(?:rf|fr)[a-z]*\s+["\x27]?(?:/\*?|~/?|\$\{?HOME\}?/?|\*)["\x27]?(?=\s|$|[;&|)])'
+  # rm with a recursive flag and a force flag, spelled any way ("-r -f", "-Rf", "--recursive --force"), at the root,
+  # the home folder, everything, or the folder it runs in. A named sub-folder such as ./build is fine.
+  - '\brm\b(?=[^\n;&|]{0,200}(?:\s-[a-z]*r|--recursive))(?=[^\n;&|]{0,200}(?:\s-[a-z]*f|--force|--no-preserve-root))[^\n;&|]{0,200}\s["\x27]?(?:/+[./*]*|~/*[.*\[\]!]*|\$\{?HOME\}?/*[.*\[\]!]*|\*|\.{1,2}/?|/(?:home|etc|usr|var|boot|bin|sbin|lib|opt|root)/?\*?)["\x27]?(?=\s|$|[;&|)`"\x27])'
+  - '\bfind\s+["\x27]?(?:/|~|\$\{?HOME\}?)["\x27]?(?:\s|/)[^\n]{0,300}(?:-delete\b|-exec\s+(?:sudo\s+)?rm\b)'
+  - '\bfind\s+["\x27]?\.{0,2}/?["\x27]?\s+(?:-exec\s+(?:sudo\s+)?rm\b|-delete\b)'
+  - '\bmv\s+(?:-\S+\s+)*["\x27]?(?:/|~|\$\{?HOME\}?)/?["\x27]?\s'
+  - '\bxargs\s+(?:-\S+\s+)*rm\s+-[a-z]*r'
+  - 'sysrq-trigger'
+  - '\bshutil\.rmtree\s*\(\s*["\x27](?:/|~|[A-Za-z]:[\\/]?)["\x27]'
+  - '\b(?:mkfs|shred|wipefs)\b'
   - '\bdd\s+if=\S+\s+of=/dev/(?:sd|nvme|disk)'
-  - ':\(\)\s*\{\s*:\|:&\s*\};:'
-  - '\b(?:mkfs|shred)\b'
+  - '\bof=/dev/(?:sd|nvme|hd|vd|disk|mmcblk)'
+  - '>\s*/dev/(?:sd|nvme|hd|vd|disk|mmcblk)'
+  - ':\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:'
+  # changing the accounts file, the password file or the sudo rules
+  - '(?:>>?|\btee\b|\btruncate\b|\bunlink\b|\bmv\b|\bcp\b|\brm\b|\bsed\s+-i)[^\n|;&]{0,100}/etc/(?:passwd|shadow|sudoers|gshadow|ssh/sshd_config)\b'
+  - '\bvisudo\b|\bNOPASSWD\b'
   - '\b(?:Remove-Item|ri)\b[^\n]{0,400}-Recurse[^\n]{0,400}-Force'
+  - '\b(?:Remove-Item|ri|rm|del|erase|rd|rmdir)\b(?=[^\n]{0,300}\s-r(?:ecurse)?\b)(?=[^\n]{0,300}\s-fo(?:rce)?\b)'
   - '\b(?:rd|rmdir)\s+/s\b'
   - '\b(?:del|erase)\s+(?:/[fsq]\s*)+'
-  - '\b(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^\n|]{0,400}\|\s*(?:iex|Invoke-Expression)\b'
-  - '\b(?:powershell|pwsh)\b[^\n]{0,400}\s-(?:enc|encodedcommand)\s'
-  - '\bcertutil\b[^\n]{0,400}-urlcache'
+  - '\b(?:del|erase)\b[^\n]{0,200}\s/[fs]\b'
+  - '\[System\.IO\.(?:Directory|File)\]::Delete\('
+  - '\b(?:Format-Volume|Clear-Disk|Stop-Computer|Restart-Computer)\b'
+  - '\bSet-ExecutionPolicy\s+(?:Bypass|Unrestricted)\b'
+  - '\bStart-Process\b[^\n]{0,200}-Verb\s+RunAs\b'
   - '\bformat\s+[A-Za-z]:'
+  # ---- running something downloaded -----------------------------------------------------------------------------
+  - '\b(?:curl|wget)\b[^\n|]{0,400}\|\s*(?:sudo\s+)?(?:ba|z)?sh\b'
+  # any pipe chain that ends in a shell or an interpreter reading its input from the pipe
+  - '\b(?:curl|wget|fetch|iwr|irm)\b[^\n]{0,400}\|\s*(?:sudo(?:\s+-\S+)*\s+)?(?:(?:ba|z|da|k|c|fi|a)?sh|cmd|pwsh|powershell|iex)\b'
+  - '\b(?:curl|wget|fetch)\b[^\n]{0,400}\|\s*(?:sudo(?:\s+-\S+)*\s+)?(?:python[0-9.]*|perl|ruby|node|php)(?:\s+-)?(?=\s*(?:$|[;&|)<>]))'
+  # shell reading a download through process or command substitution
+  - '\b(?:(?:ba|z|da|k)?sh(?:\s+-c)?|eval|source|python[0-9.]*\s+-c)\s+["\x27]?(?:<\(|\$\(|`)\s*(?:curl|wget)\b'
+  # download to a file, then run it
+  - '\b(?:curl|wget)\b[^\n]{0,300}(?:\s-o\s*|\s-O\s*|\s>\s*|--output\s+)\S+[^\n]{0,60}(?:&&|;|\|\|)\s*(?:(?:ba|z|da)?sh\b|python[0-9.]*\b|perl\b|source\b|chmod\s+(?:\+x|[0-7]*7[0-7]*)\b|\./|\.\\|\S+\.(?:exe|bat|cmd|ps1|msi|scr|sh)\b)'
+  - '\b(?:python[0-9.]*|node|ruby|perl|php)\s+-[a-z]*[ce]\s[^\n]{0,600}(?:exec|eval)\s*\([^\n]{0,400}(?:urlopen|urllib|requests\.get|http\.get|open-uri|file_get_contents)'
+  # decoded or printed text piped into a shell
+  - '\bbase64\s+(?:-d|--decode)\b[^\n|]{0,400}\|\s*(?:ba)?sh\b'
+  - '\b(?:echo|printf|xxd|openssl|base64|cat)\b[^\n|]{0,400}\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b'
+  - '\b(?:eval|source|(?:ba|z|da|k)?sh)\b[^\n]{0,300}\bbase64\s+(?:-d|--decode|-D)\b'
+  - '\b(?:exec|eval)\s*\([^\n]{0,300}(?:b64decode|decodebytes|unhexlify|fromhex|atob)\b'
+  # ---- PowerShell and Windows tools that fetch or run code ------------------------------------------------------
+  - '\b(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^\n|]{0,400}\|\s*(?:iex|Invoke-Expression)\b'
+  - '\b(?:iex|Invoke-Expression)\b[^\n]{0,400}\b(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod|DownloadString|DownloadFile|Net\.WebClient)\b'
+  - '\b(?:DownloadString|Net\.WebClient|Invoke-WebRequest|iwr)\b[^\n]{0,400}\b(?:iex|Invoke-Expression)\b'
+  - '\b(?:powershell|pwsh)(?:\.exe)?\b[^\n]{0,400}\s-(?:e|ec|en|enc|encodedcommand)\s+[A-Za-z0-9+/=]{8,}'
+  - '\b(?:powershell|pwsh)\b[^\n]{0,400}\s-(?:enc|encodedcommand)\s'
+  - '\b(?:powershell|pwsh)(?:\.exe)?\b[^\n]{0,400}\s-(?:ep|executionpolicy)\s+(?:bypass|unrestricted)\b'
+  - '\b(?:powershell|pwsh)(?:\.exe)?\b[^\n]{0,400}\s-(?:w|windowstyle)\s+hidden\b'
+  - '\b(?:mshta|regsvr32|rundll32|bitsadmin|wmic|cscript|wscript|installutil|msiexec)\b[^\n]{0,300}(?:https?://|\\\\|/i:|javascript:|/transfer\b|process\s+call\s+create)'
+  - '\bcertutil\b[^\n]{0,400}-(?:urlcache|decode|encode)'
+  # ---- opening a way in -------------------------------------------------------------------------------------------
+  - '\b(?:nc|ncat|netcat)\b[^\n]{0,400}\s(?:-e|-c|--exec|--sh-exec|--lua-exec)\b'
+  - '\bsocat\b[^\n]{0,400}\b(?:exec|system):'
+  - '\bmkfifo\b[^\n]{0,200}\|\s*(?:nc|ncat|netcat|sh|bash)\b'
+  - '\b(?:python[0-9.]*|perl|ruby|php|node)\b[^\n]{0,600}(?:socket|fsockopen|TCPSocket|net\.Socket)[^\n]{0,600}(?:/bin/(?:ba)?sh|subprocess|exec|spawn|cmd\.exe|dup2)'
+  - '/dev/tcp/'
+  - 'bash\s+-i\s*>&'
+  # ---- permissions, accounts and persistence ------------------------------------------------------------------
+  - '\bchmod\s+(?:-R\s+)?0?777\s+(?:/|~)'
+  - '\bchmod\s+(?:-R\s+)?(?:a\+rwx|ugo\+rwx)\s+["\x27]?(?:/|~|\$HOME)'
+  - '\bchmod\s+-R\s+(?:0?777|a\+rwx)\b'
+  - '\bchmod\s+-R\s+\S+\s+["\x27]?/(?:\s|$|\*)'
+  - '\bchmod\b[^\n;&|]{0,40}\s(?:[ugoa]*\+s|[2467][0-7]{3})\b'
+  - '\bchown\s+-R\s+\S+\s+["\x27]?/(?:\s|$|\*)'
+  - '\b(?:useradd|adduser)\b'
+  - '\bnet\s+(?:user|localgroup)\b[^\n]{0,200}/add\b'
+  - '\bcrontab\s+-r\b|\|\s*crontab\s+-'
+  - '\bschtasks\b[^\n]{0,200}/create\b'
+  - '\bsc(?:\.exe)?\s+(?:config|create|delete)\b'
+  - '\breg\s+(?:add|delete|save|import)\b[^\n]{0,300}(?:\\(?:Run|RunOnce|SAM|SECURITY|SYSTEM|Services)\b|Winlogon|Image File Execution)'
   - '\breg\s+(?:add|delete)\b[^\n]{0,400}\\(?:Run|RunOnce)\b'
+  - '\breg\s+delete\b[^\n]{0,300}\s/f\b'
+  - '^\s*su(?:\s+-\S*)?(?:\s+root)?\s*$'
+  - '\bsudo\s+(?:-[a-zA-Z]+\s+)*(?:su\b|(?:ba|z)?sh\b|-s\b|-i\b)'
+  - '\bLD_PRELOAD='
+  # ---- switching off protection, covering tracks, stopping the machine ------------------------------------------
+  - '\b(?:ufw\s+disable|iptables\s+-F|setenforce\s+0|auditctl\s+-e\s*0)\b'
+  - '\bsystemctl\s+(?:stop|disable|mask)\s+(?:firewalld|ufw|apparmor|auditd|fail2ban|clamav|falco)\b'
+  - '\b(?:history\s+-c|unset\s+HISTFILE|set\s+\+o\s+history)\b|HISTFILE=/dev/null'
+  - '\bSet-MpPreference\b[^\n]{0,100}-Disable|\bnetsh\s+advfirewall\s+set\b[^\n]{0,80}\boff\b'
+  - '\bkill\s+-9\s+-1\b'
+  - '\b(?:shutdown|poweroff|halt)\b\s+(?:-\w+\s+)*(?:now|0|\+0)\b|\bshutdown\s+/[srp]\b'
+  # ---- destroying infrastructure and data ---------------------------------------------------------------------
+  - '\bdocker\s+run\b[^\n]{0,300}(?:--privileged\b|--pid=host\b|docker\.sock\b|-v\s+/:/)'
+  - '\bFLUSH(?:ALL|DB)\b|\bdropDatabase\s*\('
+  - '\bdocker\s+(?:rm|kill)\s+(?:-f\s+)?\$\(\s*docker\s+ps'
+  - '\bkubectl\s+delete\s+(?:ns|namespace|-A|all)\b|\bkubectl\s+delete\b[^\n]{0,100}--all\b'
+  - '\bterraform\s+destroy\b'
+  - '\baws\s+s3\s+(?:rb|rm)\b[^\n]{0,200}--(?:force|recursive)\b'
+  - '\baws\s+iam\s+(?:create-access-key|create-user|attach-user-policy|put-user-policy)\b'
+  - '\b(?:gcloud\s+projects\s+delete|az\s+group\s+delete)\b'
+  - '\b(?:DROP|TRUNCATE)\s+(?:DATABASE|TABLE|SCHEMA)\b'
+  - '\bDELETE\s+FROM\s+\w+\s*(?:;|$|["\x27])'
 
 egress_commands:
-  - '\b(?:curl|wget)\b[^\n]{0,400}(?:\s-d\b|--data|--upload-file|\s-F\b|\s-T\b|-X\s*POST)'
-  - '\b(?:cat|printenv|env)\b[^\n|]{0,400}\|\s*(?:curl|wget|nc)\b'
+  # curl/wget sending something: data, form, upload or a write method, including combined flags such as -sd
+  - '\b(?:curl|wget)\b[^\n]{0,400}(?:\s-[a-zA-Z]*d\b|\s-[a-zA-Z]*[FT]\b|--data|--form|--upload-file|--post-(?:file|data)|--body-file|--json\b|-X\s*(?:POST|PUT|PATCH)\b|--request\s+(?:POST|PUT|PATCH)\b)'
+  # local data put into the address, a header or a DNS name of a network tool
+  - '\b(?:curl|wget|nslookup|dig|host|ping|nc|ncat|netcat|telnet)\b[^\n]{0,400}(?:\$\(|`)\s*(?:cat|type|printenv|env|set|whoami|id|hostname|uname|base64|xxd|od|gc|Get-Content|head|tail|ls|find)\b'
+  # data piped to a network tool
+  - '\b(?:cat|printenv|env|set|tar|zip|gzip|base64|xxd|type|gc|Get-Content|head|tail|dd|find|ls)\b[^\n|]{0,400}\|[^\n]{0,200}\b(?:curl|wget|nc|ncat|netcat|socat|iwr|irm|Invoke-WebRequest|Invoke-RestMethod|ftp)\b'
+  - '\|\s*(?:nc|ncat|netcat|socat|openssl\s+s_client)\b'
+  - '\b(?:nc|ncat|netcat|openssl\s+s_client|socat|ftp|telnet|mail|mailx|sendmail|http|https|xh|curl|wget)\b[^\n]{0,300}<\s*\S'
+  - 'https?://[^\s"\x27]{0,300}\$\{?[A-Za-z_]{0,40}(?:SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY|ACCESS_?KEY|PRIVATE)[A-Za-z_]{0,40}'
+  - '\bUpload(?:File|String|Data)\s*\('
+  # copying to another machine or a cloud store
+  - '\b(?:scp|rsync)\b[^\n]{0,300}\s\S+@[\w.\-]+:'
+  - '\bsftp\b[^\n]{0,300}(?:\bput\b|\S+@)'
+  - '\b(?:tftp|rclone\s+(?:copy|sync|move)|gsutil\s+(?:cp|rsync)|azcopy\s+(?:copy|sync))\b'
+  - '\baws\s+s3\s+(?:cp|sync|mv)\b[^\n]{0,300}s3://'
+  - '\baz\s+storage\s+blob\s+upload\b'
+  - '\bgh\s+gist\s+create\b'
+  - '\bgit\s+(?:push|remote\s+add)\b[^\n]{0,200}(?:https?://|git@)'
+  - '\bopenssl\s+s_client\b'
+  # scripts that post a file or the environment
+  - '\b(?:requests|httpx|urllib\S*|http\.client|aiohttp)\.[\w.]*(?:post|put|patch|urlopen|request)\b[^\n]{0,400}(?:open\(|\.read\(\)|environ|getenv)'
+  - '\bfetch\([^\n]{0,200}method\s*:\s*["\x27]POST["\x27][^\n]{0,400}(?:readFile|process\.env)'
+  # PowerShell
   - '\b(?:Invoke-WebRequest|iwr|Invoke-RestMethod|irm)\b[^\n]{0,400}(?:-Method\s+Post|-Body\b|-InFile\b)'
   - '\b(?:type|Get-Content|gc|cat)\b[^\n|]{0,400}\|\s*(?:curl|iwr|Invoke-WebRequest|nc)\b'
+  - '\b(?:cat|printenv|env)\b[^\n|]{0,400}\|\s*(?:curl|wget|nc)\b'
 
 # A command that reaches the network counts as using the network capability,
 # even when no network tool was declared.
 network_commands:
-  - '\b(?:curl|wget|nc|ncat|netcat|iwr|irm|Invoke-WebRequest|Invoke-RestMethod|certutil)\b'
+  - '\b(?:curl|wget|nc|ncat|netcat|iwr|irm|Invoke-WebRequest|Invoke-RestMethod|certutil|scp|sftp|rsync|ftp|tftp|socat|nslookup|dig)\b'
 
 sensitive_paths:
-  - '(?:~|/home/[^/\s"'']+|/Users/[^/\s"'']+|/root)/\.(?:ssh|aws|gnupg|kube|docker)(?:/|\b)'
+  - '(?:~|/home/[^/\s"\x27]+|/Users/[^/\s"\x27]+|/root)/\.(?:ssh|aws|gnupg|kube|docker)(?:/|\b)'
+  # Credential folders and dot-files, wherever they sit (a relative path such as .aws/credentials too).
+  - '(?:^|[\s/\\"\x27=])\.(?:ssh|aws|azure|kube|docker|gnupg|oci|vault-token|netrc|git-credentials|npmrc|pypirc|pgpass|my\.cnf|bash_history|zsh_history|psql_history|mysql_history|python_history)(?=$|[\\/\s"\x27;|&)])'
   # .env.example and friends hold no secrets. The end also accepts shell punctuation ("cat .env;").
-  - '(?:^|[\s/\\"''])\.env(?!\.(?:example|sample|template))(?:\.[A-Za-z0-9_\-]+)?(?=$|[\s"'';|&)])'
-  - '\bid_(?:rsa|ed25519|ecdsa)\b'
-  - '/etc/(?:passwd|shadow|sudoers)\b'
+  - '(?:^|[\s/\\"\x27])\.env(?!\.(?:example|sample|template))(?:\.[A-Za-z0-9_\-]+)?(?=$|[\s"\x27;|&)])'
+  - '\bid_(?:rsa|ed25519|ecdsa|dsa)\b'
+  - '/etc/(?:passwd|shadow|sudoers|gshadow|master\.passwd|ssh/ssh_host_\w+_key|sudoers\.d)\b'
   - '\.git-credentials\b'
   - '\.npmrc\b'
   - '\.pypirc\b'
-  - 'service[_\-]account[^\s"'']{0,200}\.json'
+  - 'service[_\-]account[^\s"\x27]{0,200}\.json'
   - '(?:%USERPROFILE%|\$env:USERPROFILE|\$HOME)[\\/]\.(?:ssh|aws|gnupg|kube|docker)(?:[\\/]|\b)'
-  - '[A-Za-z]:[\\/]Users[\\/][^\\/\s"'']+[\\/]\.(?:ssh|aws|gnupg|kube|docker)(?:[\\/]|\b)'
+  - '[A-Za-z]:[\\/]Users[\\/][^\\/\s"\x27]+[\\/]\.(?:ssh|aws|gnupg|kube|docker)(?:[\\/]|\b)'
   - '\bNTUSER\.DAT\b'
   - '[A-Za-z]:[\\/]Windows[\\/]System32[\\/]config[\\/](?:SAM|SYSTEM|SECURITY)\b'
+  - '\breg\s+save\s+HKLM\\(?:SAM|SECURITY|SYSTEM)\b'
   # Spaces are allowed: Chrome keeps these under "User Data".
-  - 'AppData[\\/](?:Roaming|Local)[\\/][^"''\n]{0,300}(?:Credentials|Login Data|Cookies)'
+  - 'AppData[\\/](?:Roaming|Local)[\\/][^"\x27\n]{0,300}(?:Credentials|Login Data|Cookies|logins\.json|key[34]\.db)'
+  # tool configs that hold logins
+  - '[\\/]\.config[\\/](?:gh[\\/]hosts\.yml|gcloud[\\/]|rclone[\\/]|doctl[\\/]|helm[\\/]|op[\\/]|hub\b)'
+  - '[\\/]\.(?:azure|oci)[\\/]'
+  - '/proc/(?:self|\d+)/(?:environ|mem|maps)\b'
+  # browsers: saved logins, cookies and keys
+  - '[\\/]\.(?:mozilla|config[\\/](?:google-chrome|chromium|BraveSoftware|microsoft-edge))[\\/][^\n"\x27]{0,200}(?:logins\.json|key[34]\.db|Login Data|Cookies|Web Data)'
+  - 'Library[\\/](?:Keychains|Application Support[\\/](?:Google[\\/]Chrome|Firefox))'
+  - '[\\/]\.local[\\/]share[\\/]keyrings[\\/]'
+  # key stores, wallets and private keys
+  - '\bwallet\.dat\b|\.keystore\b|\.jks\b|\.p12\b|\.pfx\b|\.ppk\b|\.p8\b'
+  - '(?:privkey|private|server|id|key)\.(?:pem|key)\b'
+  - '/etc/(?:ssl|pki/tls)/private/'
+  # files named for what they hold
+  - '(?:^|[\s/\\"\x27])(?:secrets?|credentials?|client_secrets?|tokens?)\.(?:ya?ml|json|toml|ini|conf|cfg|xml|properties)\b'
+  - '\.tfstate\b|credentials\.tfrc\.json|\bterraform\.tfvars\b'
+  - '(?:^|[\s/\\"\x27])application-(?:prod|production|secrets?)\.(?:properties|ya?ml)\b'
+  - '[\\/]config[\\/]secrets?\.ya?ml\b'
 
 # First word of a command that only looks at things (AGENT_SHELL_EXEC drops to medium).
 read_only_commands: [ls, pwd, whoami, date, echo, cat, head, tail, wc, grep, find, dir, type, where, findstr, get-childitem, get-location]

@@ -12,13 +12,22 @@ from dataclasses import dataclass, field
 from typing import Any, Iterator
 
 from shadowlens.analysis.masking import hash12
+from shadowlens.analysis.normalize import deobfuscate_command
 from shadowlens.analysis.settings import AgentRules, AnalysisSettings
 from shadowlens.core.ctx import AgentSessionContext
 from shadowlens.models import CapabilityName, Severity
 
 _SHELL_KEYS = ("command", "cmd", "script", "code", "input")
 _COMMAND_KEYS = ("command", "cmd")  # for tools not known to be shells
-_FILE_KEYS = ("path", "file_path", "filename", "file", "directory", "dir", "target")
+_FILE_KEYS = ("path", "file_path", "filepath", "filename", "file_name", "file", "directory", "dir", "target",
+              "target_file", "absolute_path", "relative_workspace_path", "notebook_path", "source", "src", "dest",
+              "destination", "uri", "url", "location")
+# Fields that hold what is WRITTEN or said about a call, not what it acts on. A note that mentions ".env" or
+# "rm -rf /" in one of these is not an action.
+_CONTENT_KEYS = frozenset({"content", "contents", "new_string", "old_string", "new_str", "old_str", "text", "data",
+                           "body", "diff", "patch", "file_text", "insert_text", "replacement"})
+_NOTE_KEYS = frozenset({"description", "summary", "title", "explanation", "reason", "note", "notes", "comment",
+                        "label", "name", "message", "prompt", "thought", "rationale"})
 _FILE_CAPABILITIES = frozenset({"fs_read", "fs_write"})
 _GRANTABLE = frozenset({"shell", "fs_read", "fs_write", "network", "mcp"})
 _EXCESSIVE_AT = 3
@@ -111,6 +120,40 @@ def _parse_message(message: dict[str, Any], parsed: ParsedBody) -> None:
                 parsed.results.append(text)
 
 
+def _parse_responses_items(items: Any, parsed: ParsedBody) -> None:
+    """OpenAI Responses API: ``input`` is a list of items such as ``function_call`` and ``local_shell_call``."""
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("type")
+        if kind in ("function_call", "tool_call", "custom_tool_call") and isinstance(item.get("name"), str):
+            parsed.calls.append(ToolCall(item["name"], _as_args(item.get("arguments", item.get("input")))))
+        elif kind == "local_shell_call" and isinstance(item.get("action"), dict):
+            parsed.calls.append(ToolCall("local_shell", {"command": item["action"].get("command")}))
+        elif kind in ("function_call_output", "local_shell_call_output"):
+            text = _block_text(item.get("output"))
+            if text:
+                parsed.results.append(text)
+        elif isinstance(item.get("content"), (list, str)):          # an ordinary message item
+            _parse_message(item, parsed)
+
+
+def _parse_gemini_contents(contents: Any, parsed: ParsedBody) -> None:
+    """Gemini: ``contents[].parts[]`` hold ``functionCall`` and ``functionResponse``."""
+    for content in contents if isinstance(contents, list) else []:
+        for part in content.get("parts", []) if isinstance(content, dict) and isinstance(content.get("parts"), list) else []:
+            if not isinstance(part, dict):
+                continue
+            call = part.get("functionCall")
+            if isinstance(call, dict) and isinstance(call.get("name"), str):
+                parsed.calls.append(ToolCall(call["name"], _as_args(call.get("args"))))
+            response = part.get("functionResponse")
+            if isinstance(response, dict):
+                text = _block_text(response.get("response"))
+                if text:
+                    parsed.results.append(text)
+
+
 def parse_agent_body(body_text: str | None) -> ParsedBody | None:
     """Tool declarations, calls and results in a request body, or ``None`` if there are none."""
     if not body_text:
@@ -130,13 +173,18 @@ def parse_agent_body(body_text: str | None) -> ParsedBody | None:
     for message in body.get("messages") if isinstance(body.get("messages"), list) else []:
         if isinstance(message, dict):
             _parse_message(message, parsed)
+    _parse_responses_items(body.get("input"), parsed)
+    _parse_gemini_contents(body.get("contents"), parsed)
     return None if parsed.empty else parsed
 
 
 # ---- helpers on names, commands and paths ---------------------------------------
 
 def tool_capabilities(name: str, rules: AgentRules) -> set[str]:
-    return {capability for capability, pattern in rules.capabilities.items() if pattern.fullmatch(name)}
+    """What a tool name stands for. ``runShellCommand`` is read as ``run_shell_command``."""
+    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name)
+    return {capability for capability, pattern in rules.capabilities.items()
+            if pattern.fullmatch(name) or pattern.fullmatch(words)}
 
 
 def _string_values(args: dict[str, Any], keys: tuple[str, ...]) -> list[str]:
@@ -148,11 +196,46 @@ def _string_values(args: dict[str, Any], keys: tuple[str, ...]) -> list[str]:
     return values
 
 
+def _as_command(value: Any) -> str | None:
+    """A string, or a list of words (``["rm", "-rf", "/"]``) as the one command it stands for."""
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, list) and value and all(isinstance(item, str) for item in value):
+        return " ".join(value)
+    return None
+
+
+def _acted_on_strings(value: Any, skip: frozenset[str], depth: int = 0) -> Iterator[str]:
+    """Every string in the arguments except the ones under a content or note field."""
+    if depth > 6:
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).lower() not in skip:
+                yield from _acted_on_strings(item, skip, depth + 1)
+    elif isinstance(value, list):
+        joined = _as_command(value)
+        if joined is not None:
+            yield joined
+        else:
+            for item in value:
+                yield from _acted_on_strings(item, skip, depth + 1)
+    elif isinstance(value, str) and value:
+        yield value
+
+
 def extract_commands(args: dict[str, Any], capabilities: set[str]) -> list[str]:
     commands = _string_values(args, _SHELL_KEYS if "shell" in capabilities else _COMMAND_KEYS)
     listed = args.get("commands")
     if isinstance(listed, list):
         commands.extend(item for item in listed if isinstance(item, str) and item)
+    for key in ("argv", "args", "arguments", "cmd", "command"):         # a command given as a list of words
+        joined = _as_command(args.get(key))
+        if joined is not None and joined not in commands and isinstance(args.get(key), list):
+            commands.append(joined)
+    if "shell" in capabilities and not commands:
+        # A shell tool whose command sits under a key we do not know: everything but notes about the call counts.
+        commands.extend(_acted_on_strings(args, _NOTE_KEYS))
     return commands
 
 
@@ -222,6 +305,14 @@ def matches_any(patterns: tuple[re.Pattern[str], ...], text: str) -> bool:
     return any(pattern.search(text) for pattern in patterns)
 
 
+def matches_any_view(patterns: tuple[re.Pattern[str], ...], text: str) -> bool:
+    """``matches_any`` on the command as written and as the shell will read it (``r''m``, ``\\rm``, ``${IFS}``)."""
+    if matches_any(patterns, text):
+        return True
+    plain = deobfuscate_command(text)
+    return plain != text and matches_any(patterns, plain)
+
+
 # ---- rules --------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -268,17 +359,23 @@ def _evaluate_call(call: ToolCall, is_mcp: bool, digest: str, settings: Analysis
 
     if "shell" in capabilities:
         hit("AGENT_SHELL_EXEC", "medium" if is_read_only(commands, rules) else "high")
-    if command_text and matches_any(rules.dangerous_commands, command_text):
+    if command_text and matches_any_view(rules.dangerous_commands, command_text):
         hit("AGENT_DANGEROUS_CMD", "critical")
-    if command_text and matches_any(rules.egress_commands, command_text):
+    if command_text and matches_any_view(rules.egress_commands, command_text):
         hit("AGENT_EGRESS_COMMAND", "high")
-    if command_text and matches_any(rules.network_commands, command_text):
+    if command_text and matches_any_view(rules.network_commands, command_text):
         capabilities.add("network")
 
     # File tools are judged on their path, so editing a file that merely mentions ".env" stays quiet.
     is_file_tool = bool(capabilities & _FILE_CAPABILITIES)
-    checked = paths + commands if is_file_tool or "shell" in capabilities else list(all_strings(call.args))
-    sensitive = [text for text in checked if matches_any(rules.sensitive_paths, text)]
+    if is_file_tool:
+        # Paths can sit under any key (target_file, uri, location...): check everything except file content.
+        checked = paths + commands + [x for x in _acted_on_strings(call.args, _CONTENT_KEYS | _NOTE_KEYS) if x not in paths]
+    elif "shell" in capabilities:
+        checked = paths + commands
+    else:
+        checked = list(all_strings(call.args))
+    sensitive = [text for text in checked if matches_any_view(rules.sensitive_paths, text)]
     if sensitive:
         hit("AGENT_SENSITIVE_FILE_READ", "high")
         capabilities.add("sensitive_file")

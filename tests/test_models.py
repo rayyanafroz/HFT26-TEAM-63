@@ -60,7 +60,7 @@ def test_make_tool_id():
 # ---- vocabulary (exact SOT values) -------------------------------------------
 
 def test_enum_values_are_the_sot_strings():
-    assert {x.value for x in Source} == {"conn_scan", "http_log", "har", "pcap", "live_log", "transcript", "proxy", "scenario"}
+    assert {x.value for x in Source} == {"conn_scan", "http_log", "har", "pcap", "live_log", "transcript", "proxy", "browser", "scenario"}
     assert {x.value for x in HostBasis} == {"sni", "host_header", "url", "resolved_ip", "dns_query", "port_only", "transcript"}
     assert {x.value for x in Visibility} == {"full", "metadata_only"}
     assert {x.value for x in m.AuthScheme} == {"bearer", "x-api-key", "x-goog-api-key", "basic"}

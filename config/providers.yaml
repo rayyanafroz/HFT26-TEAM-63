@@ -24,17 +24,22 @@ providers:
     category: cloud_llm
     hosts: [api.openai.com]
     native_key_rules: [SEC_OPENAI_KEY]
+    family: openai
+    clients: [codex]
 
   - id: anthropic
     display_name: Anthropic
     category: cloud_llm
     hosts: [api.anthropic.com]
     native_key_rules: [SEC_ANTHROPIC_KEY]
+    family: anthropic
+    clients: [claude]
 
   - id: google_gemini
     display_name: Google Gemini API
     category: cloud_llm
     hosts: [generativelanguage.googleapis.com]
+    ip_match: false                 # Google front ends are shared by every Google service
     native_key_rules: [SEC_GOOGLE_API_KEY]
 
   - id: mistral
@@ -107,6 +112,7 @@ providers:
     display_name: Hugging Face
     category: model_hub
     hosts: [huggingface.co, api-inference.huggingface.co, router.huggingface.co]
+    ip_match: false                 # CloudFront addresses are shared by many sites
     native_key_rules: [SEC_HF_TOKEN]
 
   # ---- AI apps and assistants ----------------------------------------------
@@ -114,21 +120,25 @@ providers:
     display_name: ChatGPT (web)
     category: ai_app
     hosts: [chatgpt.com, chat.openai.com]
+    family: openai
 
   - id: claude_web
     display_name: Claude (web)
     category: ai_app
     hosts: [claude.ai]
+    family: anthropic
 
   - id: gemini_web
     display_name: Gemini (web)
     category: ai_app
     hosts: [gemini.google.com]
+    ip_match: false                 # an ordinary Google address
 
   - id: copilot
     display_name: Microsoft / GitHub Copilot
     category: ai_app
     hosts: [copilot.microsoft.com, api.githubcopilot.com]
+    ip_match: false                 # api.githubcopilot.com shares GitHub's addresses; copilot.microsoft.com a CDN's
 
   - id: cursor
     display_name: Cursor

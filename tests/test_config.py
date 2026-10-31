@@ -19,7 +19,7 @@ def test_defaults_match_the_sot():
     assert (c.host, c.port, c.desktop) == ("127.0.0.1", 8787, True)
     assert c.db_path == Path("/proj/data/shadow.db")
     assert c.salt_path == Path("/proj/data/salt")
-    assert c.max_body_bytes == 65536
+    assert c.max_body_bytes == 262144
     assert c.workspace_roots == ("~/projects", "~/source", "/workspace")
     assert c.internal_markers == ()
     assert c.sanctioned == ("ollama",)

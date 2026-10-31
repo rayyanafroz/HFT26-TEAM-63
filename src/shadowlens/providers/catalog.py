@@ -38,6 +38,15 @@ class Provider(ShadowModel):
     native_key_rules: list[str] = Field(default_factory=list)
     sanctioned_default: bool = False
     unverified: bool = False
+    # Providers of one vendor share a family (api.anthropic.com and claude.ai are both Anthropic's and
+    # sit on the same address). An address shared only within a family belongs to the first of them.
+    family: str | None = None
+    # False for providers whose host names point at generic shared servers (GitHub, Google, a CDN), where
+    # an address alone says nothing about AI. They are still recognised by host name.
+    ip_match: bool = True
+    # Program names that are this provider's own client (e.g. "claude" for Anthropic). A program with one
+    # of these names connecting to the provider's address is a confident match, not a guess.
+    clients: list[str] = Field(default_factory=list)
 
     @field_validator("hosts")
     @classmethod
@@ -56,6 +65,11 @@ class Provider(ShadowModel):
             except re.error as exc:
                 raise ValueError(f"invalid host_regex: {exc}") from exc
         return pattern
+
+    @field_validator("clients")
+    @classmethod
+    def _clean_clients(cls, clients: list[str]) -> list[str]:
+        return [c.strip().lower().removesuffix(".exe") for c in clients if c.strip()]
 
     @field_validator("path_hints")
     @classmethod

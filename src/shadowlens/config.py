@@ -258,7 +258,7 @@ class Config:
             desktop=r.boolean("SHADOWLENS_DESKTOP", True),
             db_path=_resolve_path(r.string("SHADOWLENS_DB_PATH", "data/shadow.db"), base),
             salt_path=_resolve_path(r.string("SHADOWLENS_SALT_PATH", "data/salt"), base),
-            max_body_bytes=r.integer("SHADOWLENS_MAX_BODY_BYTES", 65536, 1),
+            max_body_bytes=r.integer("SHADOWLENS_MAX_BODY_BYTES", 262144, 1),
             workspace_roots=r.csv("SHADOWLENS_WORKSPACE_ROOTS", "~/projects,~/source,/workspace"),
             internal_markers=r.csv("SHADOWLENS_INTERNAL_MARKERS", ""),
             sanctioned=r.csv("SHADOWLENS_SANCTIONED", "ollama", lower=True),

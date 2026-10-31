@@ -31,7 +31,7 @@ from ..models import AuthScheme, HostBasis, NetEvent, Source, new_id
 
 MAX_LOG_BYTES = 20 * 1024 * 1024     # SOT 6.3
 MAX_ERRORS = 20                       # SOT 6.3
-DEFAULT_MAX_BODY_BYTES = 65536
+DEFAULT_MAX_BODY_BYTES = 262144      # most large pastes and long conversations fit whole; see keep_head_and_tail
 
 # Sources a log line may name for itself (SOT 6.3).
 _LINE_SOURCES = {s.value: s for s in (Source.HTTP_LOG, Source.PCAP, Source.CONN_SCAN, Source.SCENARIO)}
@@ -117,6 +117,22 @@ def _required_str(record: dict[str, Any], key: str) -> str:
     return value.strip()
 
 
+CUT_MARKER = "\n"
+
+
+def keep_head_and_tail(data: bytes, max_bytes: int) -> str:
+    """A body too big to read whole, as text: its start and its end, joined by a line break.
+
+    The end matters as much as the start: in a chat request the newest message, the one being sent now, is
+    last, and a long conversation (or a lot of padding) would otherwise push it out of view. Each half is cut
+    on a character boundary, so the text stays valid UTF-8.
+    """
+    half = max(1, max_bytes // 2)
+    head = data[:half].decode("utf-8", errors="ignore")
+    tail = data[-half:].decode("utf-8", errors="ignore")
+    return head + CUT_MARKER + tail
+
+
 def _prepare_body(raw: object, max_bytes: int, expand: Expander | None) -> tuple[str | None, int, str | None, bool]:
     """``(text kept for analysis, true size in bytes, sha256 of the whole body, truncated)``."""
     if raw is None:
@@ -132,8 +148,7 @@ def _prepare_body(raw: object, max_bytes: int, expand: Expander | None) -> tuple
     data = raw.encode("utf-8", errors="replace")
     sha = hashlib.sha256(data).hexdigest()
     if len(data) > max_bytes:
-        # cut on a character boundary so the kept text is valid UTF-8
-        return data[:max_bytes].decode("utf-8", errors="ignore"), len(data), sha, True
+        return keep_head_and_tail(data, max_bytes), len(data), sha, True
     return raw, len(data), sha, False
 
 

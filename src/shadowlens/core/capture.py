@@ -4,7 +4,7 @@ Three live inputs are managed here:
   * the process scan (looks at open connections every few seconds; off unless asked for),
   * the live log tail (watches ``data/live/``; on by default),
   * demo scenarios (load or play).
-The transcript reader and the Ollama tap are added in later steps; their status blocks are
+The transcript reader and the Ollama tap report their status blocks through the sources manager; they are
 already in the answer so the screen does not change shape when they arrive.
 """
 
@@ -55,8 +55,10 @@ class CaptureManager:
         player: ScenarioPlayer,
         *,
         privileged: Callable[[], bool] = is_privileged,
+        sources=None,
     ):
         self.config = config
+        self.sources = sources                          # the SourceManager, for the transcript status
         self.pipeline = pipeline
         self.scanner = scanner
         self.tail = tail
@@ -77,6 +79,9 @@ class CaptureManager:
 
     def scan_once(self) -> IngestSummary:
         """Look at the open connections now (``POST /api/scan/connections``)."""
+        wait = getattr(self.pipeline.resolver, "wait_ready", None)
+        if wait is not None:
+            wait()                                   # known provider addresses first, see Resolver.wait_ready
         with self._lock:
             result = self.scanner.scan()
             self._psutil_ok = result.psutil_ok
@@ -162,8 +167,8 @@ class CaptureManager:
                             psutil_ok=self._psutil_ok),
             live_tail=LiveTailStatus(enabled=watching, dir=str(self.tail.directory),
                                      lines_ingested=self.tail.lines_ingested),
-            transcripts=TranscriptsStatus(enabled=False),                  # filled in with the transcript reader
-            proxy=ProxyStatus(enabled=False, listen_port=cfg.proxy_port, upstream=cfg.proxy_upstream,
-                              upstream_ok=False),                          # filled in with the Ollama tap
+            transcripts=self.sources.status() if self.sources else TranscriptsStatus(enabled=False),
+            proxy=self.sources.proxy_status() if self.sources else ProxyStatus(
+                enabled=False, listen_port=cfg.proxy_port, upstream=cfg.proxy_upstream, upstream_ok=False),
             platform=current_platform(),
             scenario=self.player.status())

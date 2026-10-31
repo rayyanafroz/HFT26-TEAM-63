@@ -24,6 +24,7 @@ from ..models import (
     AlertsBySeverity,
     Capabilities,
     Capability,
+    Compliance,
     FindingCounts,
     FindingsByCategory,
     Graph,
@@ -51,6 +52,7 @@ from ..models import (
     band_for_score,
 )
 from ..providers.catalog import Catalog
+from . import compliance as compliance_map
 from .sanction import effective_sanctioned
 from .scoring import OrgScore, ToolScore, org_score, score_tool
 
@@ -99,6 +101,7 @@ class Insights:
         self.catalog = catalog
         self._scenario = scenario or (lambda: None)
         self._lock = threading.RLock()
+        self._control_defs: list | None = None
         self._cached_version = -1
         self._cache: dict[str, Any] = {}
 
@@ -290,6 +293,18 @@ class Insights:
         return Timeseries(bucket_s=bucket_s, buckets=buckets)
 
     # ---- why this score? ----------------------------------------------------
+
+    def compliance(self) -> "Compliance":
+        """Which controls have an open finding (SOT 7.6). The mapping is ``config/compliance.yaml``."""
+        def build():
+            rows = [compliance_map.OpenFinding(i, r) for i, r in self.db.open_finding_refs()]
+            return compliance_map.build(self._controls(), rows, self.risk())
+        return self._cached("compliance", build)
+
+    def _controls(self) -> list:
+        if self._control_defs is None:
+            self._control_defs = compliance_map.load_controls()
+        return self._control_defs
 
     def score_explain(self, tool_id: str | None = None) -> ScoreExplain | None:
         """Every finding's contribution to a tool's score, then the organisation score.

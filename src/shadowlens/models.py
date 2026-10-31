@@ -81,6 +81,7 @@ class Source(StrEnum):
     LIVE_LOG = "live_log"
     TRANSCRIPT = "transcript"
     PROXY = "proxy"
+    BROWSER = "browser"
     SCENARIO = "scenario"
 
 
@@ -1098,6 +1099,7 @@ class SourceKind(StrEnum):
     LIVE_LOG = "live_log"
     TRANSCRIPT = "transcript"
     PROXY = "proxy"
+    BROWSER = "browser"
 
 
 class SourceRow(ShadowModel):
