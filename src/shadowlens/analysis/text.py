@@ -1,8 +1,14 @@
-"""Detection over plain text: secrets, personal data and code (SOT 7.3)."""
+"""Detection over plain text: secrets, personal data and code (SOT 7.3).
+
+Each detector runs on its own, so one that fails costs only its own rules. ``failed`` says which
+did, and anything that decides whether text is safe to send must treat a failure as unsafe.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, field
+from typing import Callable, TypeVar
 
 from shadowlens.analysis.catalog import Candidate, TextFinding
 from shadowlens.analysis.code import find_code
@@ -12,11 +18,38 @@ from shadowlens.analysis.redact import drop_already_redacted, fill_contexts, red
 from shadowlens.analysis.secrets import find_generic_assignments, find_high_entropy, find_named_secrets
 from shadowlens.analysis.settings import AnalysisSettings
 
+log = logging.getLogger("shadowlens.analysis")
+
+T = TypeVar("T")
+
+# Shown in place of the text if redaction itself fails, because the raw text must never come back.
+REDACTION_FAILED = "[text withheld: redaction failed]"
+
 
 @dataclass
 class TextResult:
     findings: list[TextFinding]
     redacted_text: str
+    failed: list[str] = field(default_factory=list)  # names of detectors that could not run
+
+
+def clean_text(text: str) -> str:
+    """Lone surrogates, which JSON can carry ("\\ud83d") and neither pydantic nor SQLite will accept.
+    Each becomes one "?", so positions in the text do not move."""
+    try:
+        text.encode("utf-8")
+        return text
+    except UnicodeEncodeError:
+        return text.encode("utf-8", "replace").decode("utf-8")
+
+
+def _guarded(name: str, run: Callable[[], list[T]], failed: list[str]) -> list[T]:
+    try:
+        return run()
+    except Exception as exc:  # noqa: BLE001 - one broken detector must not silence the others
+        log.warning("detector %s failed (%s)", name, type(exc).__name__)  # the type only, never the text
+        failed.append(name)
+        return []
 
 
 def _build_findings(candidates: list[Candidate], salt: bytes) -> list[TextFinding]:
@@ -51,10 +84,16 @@ def analyze_text(text: str | None, settings: AnalysisSettings) -> TextResult:
     """All findings in ``text`` plus the redacted text. Also used by the Leak Lab and the egress guard."""
     if not text or not isinstance(text, str):
         return TextResult(findings=[], redacted_text=text if isinstance(text, str) else "")
+    text = clean_text(text)
+    failed: list[str] = []
 
     # Order matters inside a priority: an earlier detector wins a tie.
-    span_candidates = find_named_secrets(text) + find_pii(text) + find_generic_assignments(text)
-    entropy_hits = find_high_entropy(text, settings)
+    span_candidates = (
+        _guarded("named_secrets", lambda: find_named_secrets(text), failed)
+        + _guarded("pii", lambda: find_pii(text, settings), failed)
+        + _guarded("generic_assignments", lambda: find_generic_assignments(text, settings), failed)
+    )
+    entropy_hits = _guarded("high_entropy", lambda: find_high_entropy(text, settings), failed)
     scores = {id(candidate): score for score, candidate in entropy_hits}
     resolved = resolve_overlaps(drop_already_redacted(text, span_candidates + [c for _, c in entropy_hits]))
 
@@ -63,15 +102,25 @@ def analyze_text(text: str | None, settings: AnalysisSettings) -> TextResult:
     surviving.sort(key=lambda c: scores[id(c)], reverse=True)
     allowed = {id(c) for c in surviving[:settings.max_entropy_findings_per_event]}
     truncated = len(surviving) > len(allowed)
-    resolved = [c for c in resolved if id(c) not in scores or id(c) in allowed]
+    # Redaction still covers tokens over the cap: the cap limits findings, not what gets hidden.
+    kept = [c for c in resolved if id(c) not in scores or id(c) in allowed]
 
     # Code findings sit on top: they may contain other findings and never suppress them.
-    code = drop_already_redacted(text, find_code(text, settings.internal_markers))
-    findings = _build_findings(sorted(resolved + code, key=lambda c: (c.start, c.end)), settings.salt)
+    code = _guarded("code", lambda: drop_already_redacted(text, find_code(text, settings)), failed)
+    findings = _build_findings(sorted(kept + code, key=lambda c: (c.start, c.end)), settings.salt)
     if truncated:
         for finding in findings:
             if finding.rule_id == "SEC_HIGH_ENTROPY":
                 finding.truncated = True
 
-    fill_contexts(text, findings)
-    return TextResult(findings=findings, redacted_text=redact_text(text, findings))
+    try:
+        fill_contexts(text, findings)
+        over_cap = _build_findings([c for c in resolved if id(c) in scores and id(c) not in allowed], settings.salt)
+        redacted = redact_text(text, findings + over_cap)
+    except Exception as exc:  # noqa: BLE001 - never hand back text that was not redacted
+        log.warning("redaction failed (%s)", type(exc).__name__)
+        failed.append("redaction")
+        for finding in findings:
+            finding.context = ""
+        redacted = REDACTION_FAILED
+    return TextResult(findings=findings, redacted_text=redacted, failed=failed)

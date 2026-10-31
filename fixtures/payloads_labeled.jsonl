@@ -86,3 +86,28 @@
 {"id":"neg-confidential-no-copyright","input":{"body":"this is confidential, please keep it between us"},"expect":[]}
 {"id":"neg-short-fence","input":{"body":"run this:\n```\nnpm test\n```"},"expect":[]}
 {"id":"neg-css-color","input":{"body":"use #1a2b3c for the border and 12345px is too wide"},"expect":[]}
+{"id":"real-db-password","input":{"body":"DB_PASSWORD={{fake:password#51}}"},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"real-mysql-root","input":{"body":"MYSQL_ROOT_PASSWORD: {{fake:password#52}}"},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"real-access-token","input":{"body":"access_token={{fake:password#53}}"},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"real-jwt-secret","input":{"body":{"messages":[{"role":"user","content":"JWT_SECRET={{fake:password#54}}"}]}},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"real-camel-token","input":{"body":"const accessToken = \"{{fake:password#55}}\";"},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"real-symbol-password","input":{"body":{"messages":[{"role":"user","content":"password = \"Tr0ub4dor!3xY\""}]}},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"real-card-and-cvv","input":{"body":"card {{fake:card_visa#51}} 123 expires soon"},"expect":["PII_CREDIT_CARD"]}
+{"id":"real-qty-then-card","input":{"body":"qty 2 {{fake:card_mc#51}}"},"expect":["PII_CREDIT_CARD"]}
+{"id":"real-phone-grouped","input":{"body":"call me on +91 98765 43210 please"},"expect":["PII_PHONE"]}
+{"id":"real-phone-us","input":{"body":"reach them at +1 (415) 555-2671"},"expect":["PII_PHONE"]}
+{"id":"real-iban","input":{"body":"pay to {{fake:iban#51}} today"},"expect":["PII_IBAN"]}
+{"id":"real-form-encoded","input":{"body":"grant=password&password%3D{{fake:password#56}}"},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"real-query-encoded-key","input":{"query":"api_key%3D{{fake:password#57}}","body":"hello there"},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"real-field-name-key","input":{"body":{"{{fake:github_token#51}}":{"x":1}}},"expect":["SEC_GITHUB_TOKEN"]}
+{"id":"neg-reference-password","input":{"body":"password = settings.DB_PASSWORD"},"expect":[]}
+{"id":"neg-reference-env","input":{"body":"api_key = os.environ"},"expect":[]}
+{"id":"neg-type-hint","input":{"body":"password: str, token: Optional"},"expect":[]}
+{"id":"neg-token-count","input":{"body":"max_tokens: 4096 and token_count = 1234567890123"},"expect":[]}
+{"id":"neg-url-path","input":{"body":"see https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"},"expect":[]}
+{"id":"neg-git-url","input":{"body":"https://github.com/tcltk/tk/blob/064ff9941b4b80b85916a8afe86a6c21fd388b54/library/text.tcl"},"expect":[]}
+{"id":"neg-alphabet","input":{"body":"digits = \"abcdefghijklmnopqrstuvwxyz0123456789\""},"expect":[]}
+{"id":"neg-constant-assign","input":{"body":"CALL_BUILTIN_FAST_WITH_KEYWORDS=149,"},"expect":[]}
+{"id":"neg-long-essay","input":{"body":"Let me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support.\nLet me explain where the money came from and why it will return next quarter.\nThe private class of investors will function as a public package of support."},"expect":[]}
+{"id":"neg-digits-near-nothing","input":{"body":"1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6"},"expect":[]}
+{"id":"neg-float-exponent","input":{"body":"Decimal('1.2345E+12345680')"},"expect":[]}

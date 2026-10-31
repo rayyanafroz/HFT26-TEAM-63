@@ -144,6 +144,8 @@ class CaptureManager:
         self.player.stop()
         self.pipeline.reset()
         self.player.clear()
+        with self._lock:                                 # the next scan must see everything again
+            self.scanner.forget()
 
     # ---- the answer for the Capture screen --------------------------------
 

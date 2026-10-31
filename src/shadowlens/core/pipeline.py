@@ -241,7 +241,10 @@ class Pipeline:
         if event.visibility is not Visibility.FULL:              # nothing readable: nothing to analyse (SOT 4.3)
             return AnalysisResult()
         try:
-            return _as_result(self._analyze(event, self.config, self.contexts.get(match.tool_id)))
+            raw = self._analyze(event, self.config, self.contexts.get(match.tool_id))
+            if getattr(raw, "failed", None):                     # partial results: keep them, but say so
+                batch.error("analysis was incomplete for one event")
+            return _as_result(raw)
         except Exception as exc:  # noqa: BLE001 - a broken analyzer must not stop ingest
             log.warning("analysis failed (%s)", type(exc).__name__)
             batch.error("analysis failed for one event")

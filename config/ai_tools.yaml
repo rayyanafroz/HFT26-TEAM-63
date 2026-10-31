@@ -1,0 +1,184 @@
+# Which AI tools ShadowLens looks for on a machine (read by ingest/inventory.py).
+#
+# Matching is by EXACT identifiers: a program's name (and where it runs from), an installed app's
+# name and publisher, an editor extension id, a folder, a command on the PATH. Never loose keywords:
+# a keyword search for "assistant" finds X-Rite Color Assistant, which is not AI. The one exception
+# is browser extensions, which have no stable ids to list, so their NAMES are checked against
+# browser_extension_name_patterns and reported as "matched by name".
+#
+# A tool is listed as:  running   (a matching program is running now)
+#                       installed (an app, extension or command is present)
+#                       traces    (only its folder exists, e.g. left over after uninstalling)
+#
+# Edit freely. A broken entry is skipped with a warning; the rest still work.
+#
+# Seen on a real machine so far: claude_code, github_copilot, microsoft_copilot, google_antigravity
+# (its folder only; a first guess that called it Gemini CLI was wrong). The others come from
+# the tools' public documentation and have not been seen on a machine yet, so treat a miss on them as
+# "the signature may need fixing", not as proof the tool is absent.
+#
+# `provider` is an id from providers.yaml. For a running tool it is used to check that the program's
+# connections really go to that provider (the provider's host names are looked up and compared with
+# the program's connection addresses). Paths may use ~ and %VAR% / $VAR.
+
+tools:
+  - id: claude_code
+    name: Claude Code
+    kind: coding agent
+    provider: anthropic
+    processes:
+      - {name: claude, exe_contains: [anthropic.claude-code, claude-code]}
+    vscode_extensions: [anthropic.claude-code]
+    folders: ["~/.claude"]
+    commands: [claude]
+
+  - id: github_copilot
+    name: GitHub Copilot
+    kind: coding assistant
+    provider: copilot
+    processes:
+      - {name: copilot-runtime, exe_contains: [copilot-sdk]}
+      - {name: copilot-language-server}
+    vscode_extensions: [github.copilot, github.copilot-chat]
+    folders: ["~/.config/github-copilot", "%LOCALAPPDATA%/github-copilot"]
+
+  - id: microsoft_copilot
+    name: Microsoft Copilot
+    kind: assistant app
+    provider: copilot
+    apps:
+      - {name: Copilot, publisher: Microsoft}
+
+  - id: ollama
+    name: Ollama
+    kind: local model server
+    provider: ollama
+    processes:
+      - {name: ollama}
+      - {name: ollama app}
+      - {name: ollama_llama_server}
+    apps:
+      - {name: Ollama}
+    folders: ["~/.ollama"]
+    commands: [ollama]
+
+  - id: lm_studio
+    name: LM Studio
+    kind: local model server
+    provider: lmstudio
+    processes:
+      - {name: lm studio}
+    apps:
+      - {name: LM Studio}
+    folders: ["~/.lmstudio", "~/.cache/lm-studio"]
+    commands: [lms]
+
+  - id: cursor
+    name: Cursor
+    kind: coding agent
+    provider: cursor
+    processes:
+      - {name: cursor}
+    apps:
+      - {name: Cursor}
+    folders: ["~/.cursor"]
+    commands: [cursor]
+
+  - id: windsurf
+    name: Windsurf
+    kind: coding agent
+    processes:
+      - {name: windsurf}
+    apps:
+      - {name: Windsurf}
+    folders: ["~/.codeium/windsurf"]
+
+  - id: continue_dev
+    name: Continue
+    kind: coding assistant
+    vscode_extensions: [continue.continue]
+    folders: ["~/.continue"]
+
+  - id: codeium
+    name: Codeium
+    kind: coding assistant
+    vscode_extensions: [codeium.codeium]
+
+  - id: tabnine
+    name: Tabnine
+    kind: coding assistant
+    vscode_extensions: [tabnine.tabnine-vscode]
+
+  - id: cline
+    name: Cline
+    kind: coding agent
+    vscode_extensions: [saoudrizwan.claude-dev]
+
+  - id: amazon_q
+    name: Amazon Q
+    kind: coding assistant
+    vscode_extensions: [amazonwebservices.amazon-q-vscode]
+
+  - id: aider
+    name: Aider
+    kind: coding agent
+    commands: [aider]
+    folders: ["~/.aider"]
+
+  - id: chatgpt_desktop
+    name: ChatGPT (desktop app)
+    kind: assistant app
+    provider: chatgpt_web
+    processes:
+      - {name: chatgpt}
+    apps:
+      - {name: ChatGPT}
+
+  # ~/.gemini is shared by several Google tools, so Gemini CLI is only recognised by its command.
+  - id: gemini_cli
+    name: Gemini CLI
+    kind: coding agent
+    provider: google_gemini
+    commands: [gemini]
+
+  - id: google_antigravity
+    name: Google Antigravity
+    kind: coding agent
+    folders: ["~/.gemini/antigravity-cli", "~/.gemini/antigravity"]
+
+  - id: codex_cli
+    name: OpenAI Codex CLI
+    kind: coding agent
+    provider: openai
+    commands: [codex]
+    folders: ["~/.codex"]
+
+# Editors whose extensions are listed. extensions_dir is where the editor keeps them.
+editors:
+  - {name: VS Code, extensions_dir: "~/.vscode/extensions"}
+  - {name: VS Code Insiders, extensions_dir: "~/.vscode-insiders/extensions"}
+  - {name: Cursor, extensions_dir: "~/.cursor/extensions"}
+  - {name: Windsurf, extensions_dir: "~/.windsurf/extensions"}
+  - {name: VSCodium, extensions_dir: "~/.vscode-oss/extensions"}
+
+# Browsers whose extensions are listed. The first folder that exists on this machine is used
+# (Windows, then macOS, then Linux locations; the macOS and Linux ones are untested).
+browsers:
+  - name: Chrome
+    user_data: ["%LOCALAPPDATA%/Google/Chrome/User Data", "~/Library/Application Support/Google/Chrome", "~/.config/google-chrome"]
+  - name: Edge
+    user_data: ["%LOCALAPPDATA%/Microsoft/Edge/User Data", "~/Library/Application Support/Microsoft Edge", "~/.config/microsoft-edge"]
+  - name: Brave
+    user_data: ["%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data", "~/Library/Application Support/BraveSoftware/Brave-Browser", "~/.config/BraveSoftware/Brave-Browser"]
+
+# A browser extension whose NAME matches one of these is reported (case-insensitive).
+browser_extension_name_patterns:
+  - '\bAI\b'
+  - 'ChatGPT'
+  - '\bGPT-?\d'
+  - 'OpenAI'
+  - 'Anthropic'
+  - 'Claude'
+  - 'Gemini'
+  - 'Copilot'
+  - '\bLLM\b'

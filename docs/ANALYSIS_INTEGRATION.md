@@ -4,7 +4,8 @@ For Rayyan and any agent working on the backend. Branch: `feature/saleha-analysi
 
 The analyzer is already connected to the pipeline: `create_app` picks up `shadowlens.analysis.analyze`
 through `_default_analyzer`, with no further wiring. This file lists what changed, how to review it,
-and what is left to connect.
+and what is left to connect. How the detectors work, how to tune them and what they cannot catch is in
+[DETECTORS.md](DETECTORS.md).
 
 ## Check it first
 
@@ -17,7 +18,7 @@ Run from the repo root, with the dependencies installed:
 git status --short scenarios/templates
 ```
 
-- All tests should pass. Last full run: 1852 passed, on Windows, Python 3.15.2, with the pinned
+- All tests should pass. Last full run: 2400 passed, on Windows, Python 3.15.2, with the pinned
   fastapi, uvicorn, httpx, psutil, pydantic, PyYAML and pytest versions. `pywebview` was not installed.
 - Not yet run on Python 3.11, the team's target.
 - `scenarios.generate` should leave `scenarios/templates` unchanged.
@@ -40,6 +41,15 @@ exports the analyzer.
   path so it can report the finding.
 - If the check raises an error, the stored path becomes `PATH_HIDDEN` (`"[path hidden]"`).
 - Paths with nothing to redact keep the same event object.
+
+### `ingest/conn_scan.py` and `core/capture.py` (two small additions)
+
+Reset cleared the results but not the scanner's memory of connections it had seen in the last 60
+seconds, so a scan right after Reset reported nothing for them. Found while building the guided demo
+([DEMO.md](DEMO.md)): the live-laptop step showed 1 connection instead of 30.
+
+- `ConnectionScanner.forget()` clears that memory.
+- `CaptureManager.reset()` calls it. `tests/test_scan_after_reset.py` covers both.
 
 ### `tests/test_routes_ingest.py`
 
@@ -112,12 +122,14 @@ emails give two rows. Count each distinct finding once when computing `S`. Agent
 ### Egress guard
 
 ```python
-from shadowlens.analysis import analyze_text, settings_for
+from shadowlens.analysis import is_safe_to_send
 
-blocked = bool(analyze_text(prompt, settings_for(config)).findings)
+blocked = not is_safe_to_send(prompt, config)
 ```
 
-Text that is already a placeholder is skipped.
+Text that is already a placeholder is skipped. This fails closed: if a detector could not run, the
+answer is no. Do not use `analyze_text(...).findings` for this, because it stays empty if a detector
+failed.
 
 ### Ollama tap
 
@@ -164,9 +176,9 @@ Start and stop it from the `ollama_proxy` source toggle. It is off by default.
 
    | Run | Time | Limit |
    |---|---|---|
-   | Storage only, no analyzer | 1.78 s | |
-   | Real analyzer, clean traffic | 8.98 s | 10 s |
-   | Real analyzer, a leak in every event (10,005 findings) | 14.27 s | 10 s |
+   | Storage only, no analyzer | 1.88 s | |
+   | Real analyzer, clean traffic | 8.09 s | 10 s |
+   | Real analyzer, a leak in every event (10,005 findings) | 16.69 s | 10 s |
 
    The p95 event-to-`finding.new` target has not been measured.
 3. **`tests/test_scenarios.py` holds a copy of the §7.5 formula.** It uses the real parser, classifier,
@@ -185,8 +197,24 @@ Please update the SOT if you agree, and say so if you do not.
   on the internal `TextFinding`.
 - **§7.3 hex rule:** the rule flags 32+ hex characters, but §8.4 requires git SHAs and digests to stay
   silent. Pure hex of 32, 40 or 64 characters is now skipped, unless labelled like `token=...`.
-- **§7.3 entropy:** a token must also contain a digit. Tokens after `base64,` and `sha256-`, `sha384-` or
-  `sha512-` integrity hashes are skipped.
+- **§7.3 entropy:** a token must also contain a digit. Tokens after `base64,` or `://`, integrity hashes,
+  tokens made of words (URL paths, identifiers) and written-out alphabets are skipped. Mid-token `=` ends
+  a token. The bar is lower for short tokens: 4.2 cannot be reached by many random 24-character ones.
+- **§7.3 end of AWS, Google and JWT patterns:** a lookahead replaces `\b`. A key can end in `/`, `+`, `=`
+  or `-`, and `\b` then fails and loses the key.
+- **§7.3 generic rule:** a name may have a non-letter in front (`DB_PASSWORD`, `access_token`) or be
+  camelCase, and `pwd`, `passphrase`, `secret_key` and `access_key` count. `\b` could not see the first
+  two, because `_` is a word character. Values may hold symbols, and password names need only 8
+  characters. References, URLs, digits and names are rejected.
+- **§7.3 cards:** digit groups are tried in windows, at most 5 groups of at least 3 digits. Read whole, a
+  card and its CVV fail Luhn and the card stayed visible.
+- **§7.3 phones, Aadhaar, IBAN, hostnames:** separators and capitals are accepted. Aadhaar and IBAN try
+  every start, because a plain match on `2345 2726 6483 2751` takes the first 12 digits, fails the
+  checksum and moves past the real number.
+- **§7.3 email:** the pattern is anchored and length-limited. `\b` took 8 seconds on 64 KB of `a.a.a.`.
+- **§7.3 code:** without a fence, 3 lines must also be shaped like code, so a long essay is not source.
+- **§7.3 query and form bodies:** percent-encoding is decoded before scanning.
+- **§6.11 `rules.yaml`:** it has more settings than the SOT lists. All are validated at startup.
 - **§7.3 scan list:** the path is scanned too, as §4.2 and §7.1 say. Slashes count as separators there,
   so a long ordinary path is not read as one token.
 - **§7.3 private keys:** the match takes the base64 lines and END marker too, so key material is not left
@@ -199,6 +227,8 @@ Please update the SOT if you agree, and say so if you do not.
   `network` capability. `agent_attack` needs this.
 - **§7.4 sensitive files:** file tools are judged on their path argument only, so writing a file that
   mentions `.env` stays quiet.
+- **§7.4 patterns:** open-ended repeats are bounded to 200 to 400 characters. One took 21 seconds on a
+  64 KB command. A dangerous command spread over more than 400 characters on one line can be missed.
 - **§7.1 local ports:** the tap reports `host` as `localhost:<upstream port>`, as §7.2.2 says.
 
 ## Files
@@ -211,7 +241,12 @@ Please update the SOT if you agree, and say so if you do not.
 | `src/shadowlens/analysis/agent.py` | Protocol parsing and agent rules |
 | `src/shadowlens/analysis/redact.py`, `masking.py`, `checksums.py` | Primitives |
 | `src/shadowlens/analysis/catalog.py`, `settings.py` | Rule table and loaded settings |
+| `config/rules.yaml` | Detector thresholds and word lists, which can be tuned |
 | `config/agent_rules.yaml` | Agent patterns, which can be tuned |
+| `docs/DETECTORS.md` | How each rule works, fallbacks, limits |
+| `docs/DEMO.md`, `scenarios/demo.py` | The guided demo in one terminal, with the live event feed inline |
+| `docs/INVENTORY.md`, `ingest/inventory.py`, `config/ai_tools.yaml` | What AI is on this machine, and whether it is really talking to its provider |
+| `scenarios/leak_lab.py` | The terminal Leak Lab (type anything) |
 | `src/shadowlens/fakes.py` | Runtime fake secrets |
 | `src/shadowlens/ingest/ollama_proxy.py` | Opt-in tap |
 | `src/shadowlens/eval/run.py` | Evidence runner |

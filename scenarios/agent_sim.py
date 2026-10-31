@@ -13,6 +13,7 @@ import http.client
 import json
 import sys
 import time
+from typing import Callable
 
 from shadowlens.config import LOOPBACK_HOST
 from shadowlens.fakes import fake
@@ -26,8 +27,10 @@ def build_body(key_index: int) -> str:
     return json.dumps({"model": "llama3", "stream": False, "messages": [{"role": "user", "content": prompt}]})
 
 
-def run(port: int, count: int, interval: float, key_index: int = 0) -> int:
+def run(port: int, count: int, interval: float, key_index: int = 0,
+        report: Callable[[str], None] | None = None) -> int:
     """Sends ``count`` requests on one connection. Returns how many were answered."""
+    report = report or (lambda line: print(line, flush=True))
     connection = http.client.HTTPConnection(LOOPBACK_HOST, port, timeout=10)
     headers = {"Content-Type": "application/json", "x-shadow-client": CLIENT_NAME}
     sent = 0
@@ -37,7 +40,7 @@ def run(port: int, count: int, interval: float, key_index: int = 0) -> int:
             response = connection.getresponse()
             response.read()  # the next request can only reuse the connection once this is drained
             sent += 1
-            print(f"request {number + 1}/{count}: HTTP {response.status}", flush=True)
+            report(f"request {number + 1}/{count}: HTTP {response.status}")
             if number < count - 1:
                 time.sleep(interval)
     finally:
