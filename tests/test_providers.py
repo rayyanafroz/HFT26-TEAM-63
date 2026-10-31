@@ -60,7 +60,7 @@ def test_catalog_has_every_row_of_the_sot_table_in_order():
 def test_regex_and_port_providers():
     assert CATALOG.get("azure_openai").host_regex == r".*\.openai\.azure\.com"
     assert CATALOG.get("aws_bedrock").host_regex == r"bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com"
-    assert CATALOG.get("ollama").ports == [11434]
+    assert CATALOG.get("ollama").ports == [11434, 11435]        # 11435 is the SOT 12.2 fallback port
     assert CATALOG.get("lmstudio").ports == [1234]
     amb = CATALOG.get("local_openai_compatible")
     assert amb.ports == [8000, 8080, 5000] and amb.ports_need_path_hint is True

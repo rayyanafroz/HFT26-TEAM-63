@@ -19,13 +19,20 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..config import Config
+from ..core import hooks
+from ..core.capture import CaptureManager
 from ..core.ctx import AgentContexts
 from ..core.pipeline import AnalyzeFn, Pipeline
+from ..core.scenario_player import ScenarioPlayer
+from ..core.score_publisher import ScorePublisher
+from ..core.views import Insights
 from ..db import Database, open_database
+from ..ingest.conn_scan import ConnectionScanner
+from ..ingest.live_tail import LiveTail
 from ..models import ErrorResponse
 from ..providers.catalog import Catalog
 from ..providers.resolver import Resolver
-from . import routes_ingest, routes_stream, routes_system
+from . import routes_capture, routes_ingest, routes_insights, routes_stream, routes_system
 from .sse import EventBus
 
 log = logging.getLogger("shadowlens.api")
@@ -51,12 +58,6 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse(ErrorResponse(error=message).model_dump(), status_code=status)
 
 
-def _default_analyzer() -> AnalyzeFn | None:
-    """The real analyzer once ``shadowlens.analysis.analyze`` exists; until then the pipeline uses a stub."""
-    from .. import analysis
-    return getattr(analysis, "analyze", None)
-
-
 def create_app(
     config: Config | None = None,
     db: Database | None = None,
@@ -67,6 +68,8 @@ def create_app(
     resolver: Resolver | None = None,
     pipeline: Pipeline | None = None,
     analyze: AnalyzeFn | None = None,
+    scanner: ConnectionScanner | None = None,
+    templates_dir: Path | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -87,15 +90,36 @@ def create_app(
         if owns_db:
             config.ensure_dirs()
             app.state.db = open_database(config)
+        insights = Insights(config, app.state.db, catalog)
+        publisher = ScorePublisher(insights, bus.publish)
+        app.state.insights, app.state.publisher = insights, publisher
         owns_pipeline = pipeline is None
         app.state.pipeline = pipeline or Pipeline(
             config, app.state.db, catalog, resolver=resolver, contexts=AgentContexts(),
-            analyze=analyze or _default_analyzer(), publish=bus.publish)
+            analyze=analyze or hooks.event_analyzer(), publish=bus.publish, after_batch=publisher.notify)
+        live_pipeline = app.state.pipeline
+        player = ScenarioPlayer(live_pipeline, bus.publish, max_body_bytes=config.max_body_bytes,
+                                expand=hooks.placeholder_expander,
+                                **({"templates_dir": templates_dir} if templates_dir else {}))
+        tail = LiveTail(
+            config.live_dir, app.state.db,
+            lambda events, skipped, errors: live_pipeline.ingest(events, source="live_log", skipped=skipped, errors=errors),
+            max_body_bytes=config.max_body_bytes, expand=hooks.placeholder_expander)
+        capture = CaptureManager(config, live_pipeline, scanner or ConnectionScanner(), tail, player)
+        app.state.capture = capture
+        insights.set_scenario_source(lambda: player.name)
+        try:
+            config.live_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        capture.start_defaults()
         resolver.start()
         try:
             yield
         finally:
+            capture.shutdown()
             resolver.stop()
+            publisher.close()
             bus.close()
             if owns_pipeline:
                 app.state.pipeline = None
@@ -111,6 +135,9 @@ def create_app(
     app.state.catalog = catalog
     app.state.resolver = resolver
     app.state.pipeline = pipeline
+    app.state.insights = None       # built when the app starts (they need the database)
+    app.state.publisher = None
+    app.state.capture = None
 
     # ---- errors: always {"error": "..."} ---------------------------------
     @app.exception_handler(StarletteHTTPException)
@@ -132,6 +159,8 @@ def create_app(
     # ---- API routes ------------------------------------------------------
     app.include_router(routes_system.router)
     app.include_router(routes_ingest.router)
+    app.include_router(routes_insights.router)
+    app.include_router(routes_capture.router)
     app.include_router(routes_stream.router)
 
     # ---- dashboard files (must be added last: "/" would swallow routes) ---

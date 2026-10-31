@@ -425,3 +425,41 @@ def test_sample_file_native_keys_are_present_where_the_sot_describes():
     assert all(e.auth_scheme is AuthScheme.BEARER for e in by_host["api.openai.com"])
     assert by_host["api.mistral.ai"][0].headers["authorization"].startswith("Bearer <jwt-")       # foreign credential
     assert by_host["api-inference.huggingface.co"][0].headers["authorization"].startswith("Bearer <hf_token-")
+
+
+# ---- characters that str.splitlines() would break a line at --------------------------------
+
+# Only these can appear raw inside a valid JSON string (JSON requires control characters to be escaped).
+NASTY_CHARS = ["\u2028", "\u2029", "\u0085"]
+
+
+@pytest.mark.parametrize("char", NASTY_CHARS)
+def test_a_valid_request_containing_a_line_separator_character_is_not_torn_apart(char):
+    line = json.dumps(rec(path="/ok", body=f"before{char}after"), ensure_ascii=False)
+    assert "\n" not in line and char in line                       # one line, as far as JSONL is concerned
+    result = parse_log(line + "\n")
+    assert (len(result.events), result.skipped) == (1, 0)
+    assert result.events[0].body_text == f"before{char}after"       # intact, so the detectors can read all of it
+
+
+def test_a_secret_after_such_a_character_is_still_seen_by_the_pipeline_input():
+    line = json.dumps(rec(body="intro\u2028the key is {{fake:openai_key#1}}"), ensure_ascii=False)
+    event = parse_log(line, expand=placeholders).events[0]
+    assert "<openai_key-1>" in event.body_text
+
+
+def test_split_lines_only_breaks_at_real_line_ends():
+    assert http_log.split_lines("a\nb\r\nc") == ["a", "b", "c"]
+    assert http_log.split_lines("a\u2028b\x0cc\rd") == ["a\u2028b\x0cc\rd"]     # a lone \r is not a line end
+    assert http_log.split_lines("") == [""] and http_log.split_lines("x\n") == ["x", ""]
+    assert http_log.split_lines("\r\n\r\n") == ["", "", ""]
+
+
+def test_line_numbers_in_errors_still_count_real_lines():
+    text = rec_line("/a") + "\nbad\u2028still the same bad line\n" + rec_line("/c") + "\n"
+    result = parse_log(text)
+    assert result.errors[0].startswith("line 2:") and len(result.events) == 2
+
+
+def rec_line(path):
+    return json.dumps(rec(path=path))

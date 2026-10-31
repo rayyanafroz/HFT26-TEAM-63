@@ -152,7 +152,7 @@ providers:
   - id: ollama
     display_name: Ollama
     category: local_llm
-    ports: [11434]
+    ports: [11434, 11435]           # 11435: the fallback when a real Ollama already holds 11434 (SOT 12.2)
     path_hints: [/api/generate, /api/chat, /api/tags]
     sanctioned_default: true        # via SHADOWLENS_SANCTIONED
 
