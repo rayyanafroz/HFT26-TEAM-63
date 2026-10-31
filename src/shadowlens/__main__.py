@@ -21,6 +21,7 @@ import uvicorn
 
 from . import __version__, desktop
 from .api.app import create_app
+from .api.sse import EventBus
 from .config import Config
 
 STARTUP_TIMEOUT_S = 20.0
@@ -74,7 +75,11 @@ def wait_until_healthy(url: str, thread: threading.Thread, timeout: float = STAR
     return False
 
 
-def stop_server(server: uvicorn.Server, thread: threading.Thread) -> None:
+def stop_server(server: uvicorn.Server, thread: threading.Thread, bus: EventBus | None = None) -> None:
+    """Stop the server. Ending the live streams first lets open dashboard tabs finish cleanly;
+    otherwise uvicorn waits its grace period and then cancels them with a noisy error."""
+    if bus is not None:
+        bus.close()
     server.should_exit = True
     thread.join(timeout=10)
 
@@ -101,7 +106,8 @@ def main(
               file=sys.stderr)
         return 1
 
-    server, thread = start_server(create_app(config), config)
+    app = create_app(config)
+    server, thread = start_server(app, config)
     try:
         if not wait_until_healthy(url, thread):
             print("ShadowLens did not start. Check the messages above.", file=sys.stderr)
@@ -122,7 +128,7 @@ def main(
             print("Stopping.")
         return 0
     finally:
-        stop_server(server, thread)
+        stop_server(server, thread, app.state.bus)
 
 
 if __name__ == "__main__":

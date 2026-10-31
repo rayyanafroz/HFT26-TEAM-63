@@ -6,12 +6,10 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import Callable
-
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from ..config import Config
+from ..core import hooks
 from ..core.pipeline import Pipeline
 from ..db import Database
 from ..ingest import http_log
@@ -32,18 +30,6 @@ from .deps import get_config, get_db, get_pipeline
 router = APIRouter(prefix="/api")
 
 
-def _placeholder_expander() -> Callable[[str], str] | None:
-    """``fakes.expand`` (turns ``{{fake:...}}`` into test values) once that module exists.
-
-    It lets the bundled sample file carry only placeholders. Real logs contain none, so
-    expanding them is harmless.
-    """
-    try:
-        return importlib.import_module("shadowlens.fakes").expand
-    except (ImportError, AttributeError):
-        return None
-
-
 @router.post("/ingest/log", response_model=IngestSummary)
 def ingest_log(
     file: UploadFile = File(...),
@@ -57,7 +43,7 @@ def ingest_log(
     try:
         result = http_log.parse_log(
             data, file.filename, max_log_bytes=limit, max_body_bytes=config.max_body_bytes,
-            expand=_placeholder_expander())
+            expand=hooks.placeholder_expander())
     except http_log.LogTooLargeError as exc:
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     return pipeline.ingest_log(result)

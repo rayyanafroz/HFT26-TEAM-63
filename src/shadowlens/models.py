@@ -1220,3 +1220,12 @@ class CaptureControlRequest(ShadowModel):
 class SourceUpdateRequest(ShadowModel):
     enabled: bool
     backfill: bool = False
+
+
+# ---- live "score changed" message (SOT 6.8) ----------------------------------
+
+class ScoreUpdate(ShadowModel):
+    """Payload of the ``score.update`` stream message: the new headline score and the top tool."""
+
+    risk: RiskBlock
+    tool: TopTool | None = None

@@ -70,6 +70,17 @@ class ParseResult:
 # small value helpers
 # --------------------------------------------------------------------------
 
+def split_lines(text: str) -> list[str]:
+    """Split a JSONL file into lines at real line ends only (``\\n`` or ``\\r\\n``).
+
+    Not ``str.splitlines()``: that also breaks at U+2028, U+0085, form feed, vertical tab and a few
+    more, all of which JSON allows INSIDE a string (text copied from a web page often has U+2028).
+    Using it would tear a valid request in half and silently drop it, so anything with such a
+    character in it would escape analysis.
+    """
+    return [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
+
+
 def format_ts(moment: datetime) -> str:
     """ISO-8601 UTC with milliseconds and a trailing Z (SOT 6.1)."""
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
@@ -283,7 +294,7 @@ def parse_jsonl_line(text: str, **options: Any) -> NetEvent:
 
 
 def _parse_jsonl(text: str, result: ParseResult, **options: Any) -> None:
-    for number, line in enumerate(text.splitlines(), start=1):
+    for number, line in enumerate(split_lines(text), start=1):
         if not line.strip():
             continue
         try:

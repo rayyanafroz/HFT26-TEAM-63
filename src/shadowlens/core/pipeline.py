@@ -55,6 +55,7 @@ from ..providers.classify import classify
 from ..providers.resolver import Resolver
 from .ctx import AgentContexts, AgentSessionContext
 from .rule_titles import title_for
+from .sanction import effective_sanctioned
 
 log = logging.getLogger("shadowlens.pipeline")
 
@@ -148,7 +149,7 @@ class Pipeline:
         """Approved? A manual choice (``PUT /api/providers/{id}/sanction``) beats the default list."""
         if overrides is None:
             overrides = self.db.get_provider_overrides()
-        return overrides[provider_id] if provider_id in overrides else provider_id in self.config.sanctioned
+        return effective_sanctioned(self.config, overrides, provider_id)
 
     def ingest_log(self, result: ParseResult) -> IngestSummary:
         """Ingest a parsed upload (JSONL or HAR)."""

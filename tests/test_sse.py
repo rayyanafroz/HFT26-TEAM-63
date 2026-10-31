@@ -180,6 +180,32 @@ def test_an_open_dashboard_tab_does_not_block_shutdown(tmp_path):
     assert not thread.is_alive() and time.monotonic() - started < 8
 
 
+def test_stopping_with_the_bus_closes_open_streams_quickly_and_quietly(tmp_path, caplog):
+    """With the bus passed in, an open dashboard tab ends at once instead of being cancelled after the grace period."""
+    bus = EventBus(ping_s=30)
+    config, app, server, thread = start(tmp_path, bus)
+    connected, ended = threading.Event(), threading.Event()
+
+    def hold_open():
+        try:
+            with httpx.stream("GET", f"{config.server_url}/api/stream", timeout=30) as response:
+                for line in response.iter_lines():
+                    if line == ": connected":
+                        connected.set()
+        except httpx.HTTPError:
+            pass
+        ended.set()
+
+    threading.Thread(target=hold_open, daemon=True).start()
+    assert connected.wait(5)
+    started = time.monotonic()
+    with caplog.at_level("ERROR"):
+        entry.stop_server(server, thread, bus)
+    assert not thread.is_alive() and ended.wait(2)
+    assert time.monotonic() - started < 1.5                                   # well inside the 2 s grace period
+    assert not [r for r in caplog.records if "timeout graceful shutdown" in r.getMessage()]
+
+
 # ---- titles ------------------------------------------------------------------
 
 def test_every_rule_has_a_real_title():

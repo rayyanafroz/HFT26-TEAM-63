@@ -215,6 +215,7 @@ class Database:
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
         self._depth = 0
+        self._version = 0   # bumped by every write, so cached results know when they are stale
         # Autocommit mode: we open and close transactions explicitly (see transaction()).
         self._conn = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None)
         self._conn.row_factory = sqlite3.Row
@@ -272,8 +273,14 @@ class Database:
             finally:
                 self._depth = 0
 
+    @property
+    def version(self) -> int:
+        """Changes whenever anything is written. Cached views compare it to know they are out of date."""
+        return self._version
+
     def _run(self, sql: str, params: Sequence[Any] = ()) -> int:
         with self._lock:
+            self._version += 1
             return self._conn.execute(sql, params).rowcount
 
     def _all(self, sql: str, params: Sequence[Any] = ()) -> list[sqlite3.Row]:
@@ -328,12 +335,13 @@ class Database:
             params.append(since)
         clause = ("WHERE " + " AND ".join(where)) if where else ""
         lim, off = clamp_page(limit, offset)
-        total = self._count(f"SELECT COUNT(*) FROM events e {clause}", params)
-        rows = self._all(
-            f"""SELECT e.*, (SELECT COUNT(*) FROM findings f WHERE f.event_id = e.id) AS finding_count
-                FROM events e {clause} ORDER BY e.ts DESC, e.rowid DESC LIMIT ? OFFSET ?""",
-            [*params, lim, off],
-        )
+        with self._lock:                                         # the count and the rows must come from the same moment
+            total = self._count(f"SELECT COUNT(*) FROM events e {clause}", params)
+            rows = self._all(
+                f"""SELECT e.*, (SELECT COUNT(*) FROM findings f WHERE f.event_id = e.id) AS finding_count
+                    FROM events e {clause} ORDER BY e.ts DESC, e.rowid DESC LIMIT ? OFFSET ?""",
+                [*params, lim, off],
+            )
         items = [EventLite(
             id=r["id"], ts=r["ts"], source=r["source"], tool_id=r["tool_id"], process=r["process"],
             provider_id=r["provider_id"], host=r["host"], dst_ip=r["dst_ip"], dst_port=r["dst_port"],
@@ -399,10 +407,11 @@ class Database:
                 params.append(value)
         clause = ("WHERE " + " AND ".join(where)) if where else ""
         lim, off = clamp_page(limit, offset)
-        total = self._count(f"SELECT COUNT(*) FROM findings {clause}", params)
-        rows = self._all(
-            f"SELECT * FROM findings {clause} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?",
-            [*params, lim, off])
+        with self._lock:
+            total = self._count(f"SELECT COUNT(*) FROM findings {clause}", params)
+            rows = self._all(
+                f"SELECT * FROM findings {clause} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?",
+                [*params, lim, off])
         return Page[Finding](items=[self._finding_from_row(r) for r in rows], total=total)
 
     def count_findings(self) -> int:
@@ -485,8 +494,9 @@ class Database:
         return found
 
     def get_alert(self, alert_id: str) -> Alert | None:
-        row = self._one("SELECT * FROM alerts WHERE id = ?", (alert_id,))
-        return self._alerts_from_rows([row])[0] if row else None
+        with self._lock:
+            row = self._one("SELECT * FROM alerts WHERE id = ?", (alert_id,))
+            return self._alerts_from_rows([row])[0] if row else None
 
     def list_alerts(
         self,
@@ -511,11 +521,13 @@ class Database:
                 params.append(value)
         clause = ("WHERE " + " AND ".join(where)) if where else ""
         lim, off = clamp_page(limit, offset)
-        total = self._count(f"SELECT COUNT(*) FROM alerts {clause}", params)
-        rows = self._all(
-            f"SELECT * FROM alerts {clause} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?",
-            [*params, lim, off])
-        return Page[Alert](items=self._alerts_from_rows(rows), total=total)
+        with self._lock:                                         # also stops a reset removing rows while we join them
+            total = self._count(f"SELECT COUNT(*) FROM alerts {clause}", params)
+            rows = self._all(
+                f"SELECT * FROM alerts {clause} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?",
+                [*params, lim, off])
+            items = self._alerts_from_rows(rows)
+        return Page[Alert](items=items, total=total)
 
     def ack_alert(self, alert_id: str, at: str | None = None) -> Alert | None:
         """Acknowledge an alert (idempotent). Returns None if there is no such alert."""
@@ -563,8 +575,9 @@ class Database:
 
     def list_llm_calls(self, limit: int | None = None, offset: int | None = None) -> Page[LlmCall]:
         lim, off = clamp_page(limit, offset)
-        total = self._count("SELECT COUNT(*) FROM llm_calls")
-        rows = self._all("SELECT * FROM llm_calls ORDER BY ts DESC, rowid DESC LIMIT ? OFFSET ?", (lim, off))
+        with self._lock:
+            total = self._count("SELECT COUNT(*) FROM llm_calls")
+            rows = self._all("SELECT * FROM llm_calls ORDER BY ts DESC, rowid DESC LIMIT ? OFFSET ?", (lim, off))
         items = [LlmCall(id=r["id"], ts=r["ts"], alert_id=r["alert_id"], model=r["model"], bytes=r["bytes"],
                          status=r["status"], prompt_sha256=r["prompt_sha256"], latency_ms=r["latency_ms"])
                  for r in rows]
@@ -615,6 +628,63 @@ class Database:
 
     def get_counter(self, name: str) -> int:
         return self._count("SELECT amount FROM counters WHERE name = ?", (name,))
+
+    # ---- read-side aggregates (used to compute tools, scores, graph and summary) ----
+
+    _CONFIDENCE_RANK = "CASE provider_confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"
+
+    def tool_stats(self) -> list[sqlite3.Row]:
+        """One row per tool: how often it was seen, when, how much it sent, and how sure we are what it is."""
+        return self._all(
+            f"""SELECT tool_id, MIN(process) AS process, MIN(provider_id) AS provider_id,
+                       MIN({self._CONFIDENCE_RANK}) AS conf_rank, COUNT(*) AS event_count,
+                       SUM(bytes_out) AS bytes_out, MIN(ts) AS first_seen, MAX(ts) AS last_seen,
+                       SUM(visibility = 'full') AS full_events, SUM(visibility = 'metadata_only') AS meta_events
+                FROM events GROUP BY tool_id ORDER BY tool_id""")
+
+    def provider_stats(self) -> list[sqlite3.Row]:
+        return self._all(
+            f"""SELECT provider_id, COUNT(*) AS event_count, COUNT(DISTINCT tool_id) AS tool_count,
+                       MAX(ts) AS last_seen, MIN({self._CONFIDENCE_RANK}) AS conf_rank
+                FROM events GROUP BY provider_id""")
+
+    def scoring_findings(self) -> list[sqlite3.Row]:
+        """Every finding, with only the columns scoring needs, oldest first."""
+        return self._all(
+            "SELECT id, tool_id, rule_id, category, severity, confidence, created_at "
+            "FROM findings ORDER BY created_at, rowid")
+
+    def capability_flags(self) -> list[sqlite3.Row]:
+        """Per tool and capability: was it granted, used, and was any use risky."""
+        return self._all(
+            """SELECT tool_id, capability, MAX(kind = 'granted') AS granted, MAX(kind = 'used') AS used,
+                      MAX(risky) AS risky
+               FROM agent_activity GROUP BY tool_id, capability""")
+
+    def alert_counts_by_severity(self, status: str = "open") -> dict[str, int]:
+        return {r["severity"]: r["n"] for r in self._all(
+            "SELECT severity, COUNT(*) AS n FROM alerts WHERE status = ? GROUP BY severity", (status,))}
+
+    def finding_counts_by_category(self) -> dict[str, int]:
+        return {r["category"]: r["n"] for r in self._all(
+            "SELECT category, COUNT(*) AS n FROM findings GROUP BY category")}
+
+    def event_times(self, since: str | None = None) -> list[str]:
+        if since is None:
+            return [r["ts"] for r in self._all("SELECT ts FROM events")]
+        return [r["ts"] for r in self._all("SELECT ts FROM events WHERE ts >= ?", (since,))]
+
+    def alert_event_times(self, since: str | None = None) -> list[str]:
+        """When the event behind each alert happened (so alerts and events share one time axis)."""
+        sql = ("SELECT e.ts AS ts FROM alerts a JOIN findings f ON f.id = a.finding_id "
+               "JOIN events e ON e.id = f.event_id")
+        if since is None:
+            return [r["ts"] for r in self._all(sql)]
+        return [r["ts"] for r in self._all(sql + " WHERE e.ts >= ?", (since,))]
+
+    def last_event_at(self) -> str | None:
+        row = self._one("SELECT MAX(ts) AS ts FROM events")
+        return row["ts"] if row else None
 
     # ---- reset -----------------------------------------------------------
 

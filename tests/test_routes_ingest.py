@@ -248,7 +248,7 @@ def test_acknowledging_an_unknown_or_malformed_id(client):
 
 def test_the_app_publishes_to_its_bus(client, bus):
     upload(client, json.dumps({"ts": "2026-10-31T10:00:00Z", "host": "api.openai.com", "method": "POST", "path": "/v1"}))
-    assert bus.sent == ["event.new", "finding.new", "alert.new"]
+    assert bus.sent == ["event.new", "finding.new", "alert.new", "score.update"]    # the score follows the batch
     assert client.app.state.pipeline is not None and client.app.state.bus is bus
 
 
