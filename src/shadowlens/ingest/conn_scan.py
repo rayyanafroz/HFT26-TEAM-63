@@ -91,6 +91,11 @@ class ConnectionScanner:
         self._forget_after = forget_after_s
         self._seen: dict[tuple[int, str, int], float] = {}      # (pid, ip, port) -> last time we saw it
 
+    def forget(self) -> None:
+        """Treat every connection as new again. Reset needs this: otherwise the scan right after it
+        reports nothing for connections it saw in the last minute, and the screen stays empty."""
+        self._seen.clear()
+
     def scan(self) -> ScanResult:
         """One look at the open connections. Returns events for the ones not seen before."""
         try:
