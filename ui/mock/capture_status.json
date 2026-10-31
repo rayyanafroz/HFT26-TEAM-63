@@ -19,5 +19,20 @@
   "played": 112,
   "total": 160
  },
- "since": "2026-10-31T09:12:04"
+ "transcripts": {
+  "enabled": true,
+  "sources_active": 1,
+  "files_watched": 12,
+  "lines_ingested": 4310
+ },
+ "proxy": {
+  "enabled": true,
+  "listen_port": 11436,
+  "upstream": "127.0.0.1:11434",
+  "upstream_ok": true,
+  "requests_ingested": 98,
+  "error": null
+ },
+ "since": "2026-10-31T09:12:04.000Z",
+ "stopped_at": null
 }

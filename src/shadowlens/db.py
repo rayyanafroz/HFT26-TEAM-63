@@ -483,10 +483,13 @@ class Database:
             return []
         findings = self._by_ids("findings", "id", [r["finding_id"] for r in rows])
         remediations = self._by_ids("remediations", "alert_id", [r["id"] for r in rows])
+        events = self._by_ids("events", "id", list({f["event_id"] for f in findings.values()}))
         out = []
         for r in rows:
             rem = remediations.get(r["id"])
+            event = events.get(findings[r["finding_id"]]["event_id"])
             out.append(Alert(
+                source=event["source"] if event else None,
                 id=r["id"], finding_id=r["finding_id"], tool_id=r["tool_id"], provider_id=r["provider_id"],
                 rule_id=r["rule_id"], severity=r["severity"], title=r["title"], status=r["status"],
                 created_at=r["created_at"], acked_at=r["acked_at"],

@@ -70,6 +70,8 @@ class CaptureManager:
         self._scan_interval = config.scan_interval_s or DEFAULT_SCAN_INTERVAL_S
         self._last_scan_at: str | None = None
         self._psutil_ok = True
+        self._since: str | None = None                  # when the mode last left idle (the Home screen's "On since")
+        self._stopped_at: str | None = None             # when it last went back to idle
 
     # ---- process scan ----------------------------------------------------
 
@@ -138,6 +140,7 @@ class CaptureManager:
         self.tail.start()
         if self.config.scan_interval_s > 0:
             self.start_scan()
+        self.status()                                    # stamps "since" at app start, not at the first read
 
     def shutdown(self) -> None:
         self.player.stop()
@@ -158,6 +161,12 @@ class CaptureManager:
         scanning, watching, playing = self.scan_running, self.tail.running, self.player.playing
         mode = (CaptureMode.PLAYING if playing else CaptureMode.SCANNING if scanning
                 else CaptureMode.WATCHING if watching else CaptureMode.IDLE)
+        with self._lock:                                 # start/stop return status(), so transitions are stamped then
+            if mode is CaptureMode.IDLE and self._since is not None:
+                self._since, self._stopped_at = None, utc_now_iso()
+            elif mode is not CaptureMode.IDLE and self._since is None:
+                self._since = utc_now_iso()
+            since, stopped_at = self._since, self._stopped_at
         privileged = self._privileged()
         cfg = self.config
         return CaptureStatus(
@@ -171,4 +180,6 @@ class CaptureManager:
             proxy=self.sources.proxy_status() if self.sources else ProxyStatus(
                 enabled=False, listen_port=cfg.proxy_port, upstream=cfg.proxy_upstream, upstream_ok=False),
             platform=current_platform(),
-            scenario=self.player.status())
+            scenario=self.player.status(),
+            since=since,
+            stopped_at=stopped_at)

@@ -26,7 +26,7 @@ export const OWASP = {
 };
 export const owaspName = (id) => (OWASP[id] ? `${id} ${OWASP[id]}` : id);
 
-/** Where a finding came from. Events carry source (SOT 6.2); alerts do not yet, so this reads an optional field. */
+/** Where a finding came from. Events and alerts carry source (SOT 6.2); null for an alert whose event is gone. */
 const SOURCES = { live_log: "live log", http_log: "upload", har: "upload", pcap: "upload", conn_scan: "scan", scenario: "scenario",
-  transcript: "live transcript", ollama_tap: "Ollama tap" };
+  transcript: "live transcript", proxy: "Ollama tap", ollama_tap: "Ollama tap", browser: "browser" };
 export const sourceName = (s) => (s ? SOURCES[s] ?? s : "–");

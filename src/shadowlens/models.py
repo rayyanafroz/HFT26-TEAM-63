@@ -495,6 +495,7 @@ class Alert(ShadowModel):
     acked_at: Timestamp | None = None
     finding: Finding
     remediation: Remediation | None = None
+    source: Source | None = None            # where the event behind the finding came from; display only
 
     @model_validator(mode="after")
     def _consistent(self) -> "Alert":
@@ -854,6 +855,53 @@ class ScoreOrg(ShadowModel):
         return self
 
 
+class ScoreModel(ShadowModel):
+    """The constants the scorer uses right now (core/scoring.py, config/providers.yaml), so the UI never restates them."""
+
+    w_sev: dict[str, float]
+    m_sanctioned: float
+    m_unsanctioned: float
+    count_factors: list[float]                  # factor for the 1st, 2nd, ... finding of a rule per tool
+    score_scale: float                          # the 80 in 100 x (1 - e^(-S/80))
+    org_weight_max: float
+    org_weight_top3: float
+    category_exposure: dict[str, float]
+    bands: dict[str, list[int]]                 # band -> [low, high] inclusive
+
+
+class PointsBucket(ShadowModel):
+    key: str
+    points: float = Field(ge=0)
+    findings: int = Field(default=0, ge=0)
+
+
+class ToolContribution(ShadowModel):
+    tool_id: str
+    display_name: str
+    S: float = Field(ge=0)
+    score: int = Field(ge=0, le=100)
+    band: Band
+    findings: int = Field(ge=0)
+    sanctioned: bool
+    m_exposure: float = Field(ge=0)
+
+
+class ScoreMetrics(ShadowModel):
+    """Live figures behind the org risk, from the same snapshot as ``/api/score/explain``."""
+
+    model: ScoreModel
+    org: ScoreOrg
+    total_points: float = Field(ge=0)
+    scored_findings: int = Field(ge=0)          # findings that carry points
+    capped_findings: int = Field(ge=0)          # past the per-rule cap, so worth 0 points
+    unconfirmed_tools: int = Field(ge=0)        # provider match is a guess: left out of the score
+    tools_scored: int = Field(ge=0)
+    points_by_severity: list[PointsBucket] = Field(default_factory=list)
+    points_by_category: list[PointsBucket] = Field(default_factory=list)
+    tools: list[ToolContribution] = Field(default_factory=list)   # riskiest first
+    computed_at: Timestamp
+
+
 class ScoreExplain(ShadowModel):
     tool_id: str
     S: float = Field(ge=0)
@@ -1093,6 +1141,8 @@ class CaptureStatus(ShadowModel):
     proxy: ProxyStatus
     platform: Platform
     scenario: ScenarioStatus = Field(default_factory=ScenarioStatus)
+    since: Timestamp | None = None          # when watching last went from idle to on; None while idle
+    stopped_at: Timestamp | None = None     # when it last went back to idle; None if it never has
 
 
 class SourceKind(StrEnum):

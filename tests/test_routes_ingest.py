@@ -206,8 +206,9 @@ def test_list_alerts(client, loaded):
     assert page["total"] == 27
     alert = page["items"][0]
     assert set(alert) == {"id", "finding_id", "tool_id", "provider_id", "rule_id", "severity", "title",
-                          "status", "created_at", "acked_at", "finding", "remediation"}
+                          "status", "created_at", "acked_at", "finding", "remediation", "source"}
     assert alert["status"] == "open" and alert["remediation"] is None and alert["finding"]["id"] == alert["finding_id"]
+    assert all(a["source"] for a in page["items"])                 # every alert names where its event came from
 
 
 def test_alert_filters(client, loaded):

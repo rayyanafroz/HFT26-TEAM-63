@@ -1,1 +1,17 @@
-{"id": "x"}
+{
+ "id": "claude_code",
+ "display_name": "Claude Code transcripts",
+ "kind": "transcript",
+ "found": true,
+ "enabled": true,
+ "supported": true,
+ "error": null,
+ "paths": [
+  "~/.claude/projects/**/*.jsonl"
+ ],
+ "files_watched": 12,
+ "lines_ingested": 4310,
+ "last_event_at": "2026-10-31T09:41:12.000Z",
+ "reads": "Prompts, tool calls and tool results in these files, line by line.",
+ "stores": "Only masked findings."
+}

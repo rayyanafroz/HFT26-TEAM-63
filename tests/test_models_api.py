@@ -301,7 +301,8 @@ def test_evidence_unavailable():
 
 def test_capture_status_names():
     data = json.loads(capture_status().model_dump_json())
-    assert set(data) == {"mode", "scan", "live_tail", "transcripts", "proxy", "platform", "scenario"}
+    assert set(data) == {"mode", "scan", "live_tail", "transcripts", "proxy", "platform", "scenario",
+                         "since", "stopped_at"}
     assert set(data["scan"]) == {"enabled", "interval_s", "last_scan_at", "scope", "privileged", "psutil_ok"}
     assert set(data["live_tail"]) == {"enabled", "dir", "lines_ingested"}
     assert set(data["transcripts"]) == {"enabled", "sources_active", "files_watched", "lines_ingested"}
