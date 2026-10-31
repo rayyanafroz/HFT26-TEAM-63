@@ -252,7 +252,8 @@ def test_list_findings_filters(db):
 def test_alert_round_trip_includes_the_finding(db):
     _, f, a = seed(db)
     got = db.get_alert(a.id)
-    assert got == a and got.finding == f and got.remediation is None
+    assert got.model_copy(update={"source": None}) == a and got.source is not None
+    assert got.finding == f and got.remediation is None
     assert db.get_alert(new_id()) is None
 
 
@@ -471,7 +472,9 @@ def test_data_survives_closing_and_reopening(tmp_path):
     with Database(path) as first:
         _, _, a = seed(first)
     with Database(path) as second:
-        assert second.get_alert(a.id) == a
+        back = second.get_alert(a.id)
+        assert back.source is not None                 # read back from the alert's event
+        assert back.model_copy(update={"source": a.source}) == a
 
 
 def test_concurrent_writers_do_not_lose_rows(db):

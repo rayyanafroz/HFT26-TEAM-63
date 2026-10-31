@@ -107,7 +107,8 @@ def test_scan_connections(client):
 
 def test_capture_status_shape(client):
     s = client.get("/api/capture/status").json()
-    assert set(s) == {"mode", "scan", "live_tail", "transcripts", "proxy", "platform", "scenario"}
+    assert set(s) == {"mode", "scan", "live_tail", "transcripts", "proxy", "platform", "scenario",
+                     "since", "stopped_at"}
     assert set(s["scan"]) == {"enabled", "interval_s", "last_scan_at", "scope", "privileged", "psutil_ok"}
     assert set(s["proxy"]) == {"enabled", "listen_port", "upstream", "upstream_ok", "requests_ingested", "error"}
     assert s["live_tail"]["enabled"] is True and s["mode"] == "watching"      # the tail starts with the app
@@ -123,6 +124,17 @@ def test_start_and_stop(client):
     none = client.post("/api/capture/stop").json()
     assert (none["scan"]["enabled"], none["live_tail"]["enabled"]) == (False, False)
     assert none["mode"] == "idle"
+
+
+def test_since_and_stopped_at_follow_the_switch(client):
+    client.post("/api/capture/stop")
+    off = client.get("/api/capture/status").json()
+    assert off["since"] is None and off["stopped_at"] is not None
+    on = client.post("/api/capture/start", json={"scan": True}).json()
+    assert on["since"] is not None and on["stopped_at"] == off["stopped_at"]
+    assert client.post("/api/capture/start", json={"tail": True}).json()["since"] == on["since"]   # still the same session
+    again = client.post("/api/capture/stop").json()
+    assert again["since"] is None and again["stopped_at"] >= on["since"]
 
 
 def test_switch_validation(client):

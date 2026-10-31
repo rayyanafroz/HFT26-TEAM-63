@@ -138,7 +138,7 @@ def test_alert_json_names_and_round_trip():
     alert = make_alert()
     data = json.loads(alert.model_dump_json())
     assert set(data) == {"id", "finding_id", "tool_id", "provider_id", "rule_id", "severity", "title",
-                         "status", "created_at", "acked_at", "finding", "remediation"}
+                         "status", "created_at", "acked_at", "finding", "remediation", "source"}
     assert Alert.model_validate_json(alert.model_dump_json()) == alert
 
 

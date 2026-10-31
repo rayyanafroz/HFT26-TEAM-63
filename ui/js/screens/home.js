@@ -3,7 +3,7 @@
 // Turning on has no confirmation because none is drawn (UD-02). Loading and error states follow p9 (UD-03).
 import { el, fmtNumber, fmtTime, bandLabel, pct, bandTone } from "../ui.js";
 import { openModal } from "../components/modal.js";
-import { watch, load, byNewest, cardError, alertHref } from "./util.js";
+import { watch, load, byNewest, cardError, alertHref, sourceDetail } from "./util.js";
 
 const TOPICS = ["summary", "alerts", "capture", "sources"];
 
@@ -94,7 +94,7 @@ export function mount(container, ctx) {
 
   function monitorRows(cap, sources, on) {
     // The live log folder row comes from capture status below, and unsupported sources are not shown.
-    const rows = (sources?.items ?? []).filter((s) => s.kind !== "live_log" && s.supported !== false).map((s) => ({ name: s.name, active: on && s.enabled, detail: on ? (s.enabled ? s.detail : "off") : (s.enabled ? "paused" : "off") }));
+    const rows = (sources?.items ?? []).filter((s) => s.kind !== "live_log" && s.supported !== false).map((s) => ({ name: s.display_name, active: on && s.enabled, detail: on ? (s.enabled ? sourceDetail(s, fmtNumber) : "off") : (s.enabled ? "paused" : "off") }));
     if (cap) {
       rows.push({ name: "Live scan", active: on && cap.scan.enabled, detail: on && cap.scan.enabled ? `every ${cap.scan.interval_s} s` : "off" });
       rows.push({ name: "Live log folder", active: on && cap.live_tail.enabled, detail: on && cap.live_tail.enabled ? `${fmtNumber(cap.live_tail.lines_ingested)} lines` : "off" });

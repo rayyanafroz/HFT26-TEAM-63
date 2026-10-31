@@ -1,8 +1,8 @@
 // Capture (Frontend Design PDF p16 visibility, p17 controls, p18 sources). Three views under one nav link: ?view=visibility|controls|sources.
-// Sources (P1) uses /api/sources, which is not in SOT 6.7 yet: list GET /api/sources, switch PUT /api/sources/{id} {enabled},
-// "Scan existing history" POST /api/sources/{id}/scan. These paths are proposals until the backend confirms them.
+// Sources: list GET /api/sources, switch PUT /api/sources/{id} {enabled}. "Scan existing history" is the same PUT with
+// backfill: true; the source then reads the recent past in the background, so results arrive over the live stream.
 import { el, fmtNumber, fmtTime, pct } from "../ui.js";
-import { watch, load } from "./util.js";
+import { watch, load, SOURCE_UNIT } from "./util.js";
 
 const VIEWS = [{ id: "visibility", label: "Visibility" }, { id: "controls", label: "Controls" }, { id: "sources", label: "Sources" }];
 const SUBTITLE = { visibility: "What ShadowLens watches, and what it cannot see.", controls: "Controls, scenarios and the last ingest.", sources: "One card per source. Switch it on to start watching." };
@@ -61,8 +61,9 @@ export function mount(container, ctx) {
     const card = el("section", { class: "card" }, el("h2", { class: "label card__label" }, "Capture status"));
     if (!cap) { card.append(stateOf("capture", "the status")); return card; }
     const src = store.get("sources")?.items ?? [];
-    const trans = src.filter((x) => x.kind === "transcripts" && x.enabled);
-    const tap = src.find((x) => x.kind === "ollama_tap");
+    const trans = src.filter((x) => x.kind === "transcript" && x.enabled);
+    const tap = src.find((x) => x.kind === "proxy");
+    const px = cap.proxy;
     const item = (k, v, strong, tone = "") => el("div", { class: "stat" }, el("div", { class: "label" }, k), el("div", { class: `${strong ? "stat__v is-strong" : "stat__v"} ${tone}` }, v));
     card.append(el("div", { class: "stat-grid" },
       item("Mode", cap.mode, true, cap.mode === "idle" ? "" : "tone-green"),
@@ -72,8 +73,8 @@ export function mount(container, ctx) {
       item("Elevated rights", cap.scan.privileged ? "yes" : "no"),
       item("Platform", PLATFORM[cap.platform] ?? cap.platform),
       item("Live log folder", cap.live_tail.enabled ? `${cap.live_tail.dir} · ${fmtNumber(cap.live_tail.lines_ingested)} lines` : "off"),
-      src.length ? item("Transcripts", trans.length ? `${trans.length} source${trans.length > 1 ? "s" : ""} · ${fmtNumber(trans.reduce((n, x) => n + (x.files_watched ?? 0), 0))} files · ${fmtNumber(trans.reduce((n, x) => n + (x.lines_read ?? 0), 0))} lines` : "off") : null,
-      tap ? item("Ollama tap", tap.enabled ? `on · port ${tap.listen} → ${tap.upstream} · ${fmtNumber(tap.lines_read ?? 0)} requests` : "off") : null,
+      src.length ? item("Transcripts", trans.length ? `${trans.length} source${trans.length > 1 ? "s" : ""} · ${fmtNumber(trans.reduce((n, x) => n + (x.files_watched ?? 0), 0))} files · ${fmtNumber(trans.reduce((n, x) => n + (x.lines_ingested ?? 0), 0))} lines` : "off") : null,
+      tap ? item("Ollama tap", tap.enabled && px ? `on · port ${px.listen_port} → ${px.upstream} · ${fmtNumber(tap.lines_ingested ?? 0)} requests` : "off") : null,
       tap ? item("Last tap error", tap.error ?? "none") : null));
     if (cap.scan.scope === "own_user" && !cap.scan.privileged) {
       card.append(el("p", { class: "small cap-note" }, "The scan sees only processes owned by your user. Run ShadowLens with elevated rights to see all users."));
@@ -164,32 +165,44 @@ export function mount(container, ctx) {
     return el("div", { class: "src-grid" }, ...e.data.items.map(sourceCard));
   }
 
+  // The PUT answers with the updated row; it replaces ours. Findings follow over the live stream.
+  async function setSource(s, enabled, backfill = false) {
+    const r = await api.put(`/api/sources/${encodeURIComponent(s.id)}`, { enabled, backfill });
+    store.patch("sources", (old) => old && { ...old, items: old.items.map((x) => (x.id === s.id ? (r?.id === s.id ? r : { ...x, enabled }) : x)) });
+    if (enabled && r && !r.enabled) toasts.error(`Could not turn ${s.display_name} on.`, r.error ?? "The source did not start.");
+    ["capture", "summary"].forEach((t) => store.refresh(t));
+    setTimeout(() => ["sources", "summary", "alerts"].forEach((t) => store.refresh(t)), 2500);   // background reads land shortly
+  }
+
   function sourceCard(s) {
     const unsupported = s.supported === false;
     const toggleId = `src-${s.id}`;
     const sw = P.toggle({ checked: !!s.enabled, disabled: unsupported || busy === toggleId, name: toggleId,
-      onChange: (on) => doAction(toggleId, async () => {
-        const r = await api.put(`/api/sources/${encodeURIComponent(s.id)}`, { enabled: on });
-        store.patch("sources", (old) => old && { ...old, items: old.items.map((x) => (x.id === s.id ? { ...x, ...(r?.id === s.id ? r : {}), enabled: on } : x)) });
-      }, `Could not turn ${s.name} ${on ? "on" : "off"}.`) });
-    sw.querySelector("input").setAttribute("aria-label", `${s.name} ${s.enabled ? "on" : "off"}`);
-    const where = s.kind === "ollama_tap" ? `listen ${s.listen} → upstream ${s.upstream}` : s.path ?? "";
+      onChange: (on) => doAction(toggleId, () => setSource(s, on), `Could not turn ${s.display_name} ${on ? "on" : "off"}.`) });
+    sw.querySelector("input").setAttribute("aria-label", `${s.display_name} ${s.enabled ? "on" : "off"}`);
+    const where = (s.paths ?? []).join(", ");
     const kv = (k, v) => [el("dt", {}, k), el("dd", { class: "mono" }, v)];
+    const unit = SOURCE_UNIT[s.kind] ?? "lines";
     const card = el("section", { class: "card src" },
-      el("div", { class: "src__head" }, el("h2", { class: "src__name" }, s.name), sw),
+      el("div", { class: "src__head" }, el("h2", { class: "src__name" }, s.display_name), sw),
       where ? el("div", { class: "src__where" }, where) : null,
       el("div", { class: `src__found ${s.found ? "is-ok" : ""}` }, P.stateCell(s.found ? "used" : "granted", { label: s.found ? "found" : "not found" })),
       el("dl", { class: "pkv src__kv" },
-        ...kv("Files watched", s.kind === "ollama_tap" ? "n/a" : fmtNumber(s.files_watched ?? 0)),
-        ...kv("Lines read", fmtNumber(s.lines_read ?? 0)),
+        ...kv("Files watched", s.kind === "proxy" ? "n/a" : fmtNumber(s.files_watched ?? 0)),
+        ...kv(`${unit[0].toUpperCase()}${unit.slice(1)} read`, fmtNumber(s.lines_ingested ?? 0)),
         ...kv("Last event", fmtTime(s.last_event_at))),
-      el("p", { class: "src__line" }, el("strong", {}, "Reads: "), s.reads ?? "Nothing yet."),
-      el("p", { class: "src__line" }, el("strong", {}, "Stores: "), s.stores ?? "Only masked findings."));
+      el("p", { class: "src__line" }, el("strong", {}, "Reads: "), s.reads || "Nothing yet."),
+      el("p", { class: "src__line" }, el("strong", {}, "Stores: "), s.stores || "Only masked findings."));
+    const listen = store.get("capture")?.proxy?.listen_port;
     if (s.error || unsupported) card.append(el("div", { class: "error-box src__err", role: "alert" }, s.error ?? "Not supported on this platform."));
-    else if (s.kind === "transcripts") card.append(P.button({ label: busy === `hist-${s.id}` ? "Scanning…" : "Scan existing history", variant: "small", disabled: !!busy,
-      onClick: () => doAction(`hist-${s.id}`, async () => ingested(await api.post(`/api/sources/${encodeURIComponent(s.id)}/scan`), s.name), `Could not scan ${s.name}.`) }));
-    else if (s.kind === "ollama_tap" && s.listen) {
-      const url = `http://127.0.0.1:${s.listen}`;
+    if (unsupported) return card;
+    if ((s.kind === "transcript" || s.kind === "browser") && s.found) card.append(P.button({ label: busy === `hist-${s.id}` ? "Scanning…" : "Scan existing history", variant: "small", disabled: !!busy,
+      onClick: () => doAction(`hist-${s.id}`, async () => {
+        await setSource(s, true, true);
+        toasts.info(`Reading recent history from ${s.display_name}`, "Findings appear as they are found.", "Sources");
+      }, `Could not scan ${s.display_name}.`) }));
+    else if (s.kind === "proxy" && s.enabled && listen) {
+      const url = `http://127.0.0.1:${listen}`;
       const copyBtn = el("button", { class: "src__copy", type: "button" }, "Copy");
       copyBtn.addEventListener("click", async () => {
         try { await navigator.clipboard.writeText(url); copyBtn.textContent = "Copied"; }

@@ -47,6 +47,7 @@ from ..models import (
     NetEvent,
     ProviderMatch,
     Severity,
+    Source,
     Visibility,
     new_id,
     utc_now_iso,
@@ -218,7 +219,7 @@ class Pipeline:
                         continue
                     stored.append(finding)
                     messages.append(("finding.new", finding))
-                    alert = self._alert_for(finding, match)
+                    alert = self._alert_for(finding, match, event.source)
                     if alert is not None:
                         self.db.insert_alert(alert)
                         alerts.append(alert)
@@ -303,7 +304,7 @@ class Pipeline:
                                     stamp(now - timedelta(seconds=REPEAT_ALERT_GAP_S)))
 
     @staticmethod
-    def _alert_for(finding: Finding, match: ProviderMatch) -> Alert | None:
+    def _alert_for(finding: Finding, match: ProviderMatch, source: Source | None = None) -> Alert | None:
         """An alert for every finding of at least medium severity, and for each unapproved tool (SOT 7.5)."""
         unsanctioned = finding.rule_id == POLICY_UNSANCTIONED
         if not unsanctioned and finding.severity.rank < ALERT_MIN_SEVERITY.rank:
@@ -311,7 +312,7 @@ class Pipeline:
         title = f"{title_for(finding.rule_id)}: {match.display_name}" if unsanctioned else title_for(finding.rule_id)
         return Alert(id=new_id(), finding_id=finding.id, tool_id=finding.tool_id, provider_id=match.provider_id,
                      rule_id=finding.rule_id, severity=finding.severity, title=title,
-                     created_at=utc_now_iso(), finding=finding)
+                     created_at=utc_now_iso(), finding=finding, source=source)
 
     def _store_activity(self, match: ProviderMatch, activity: list[AgentActivity], new_finding_ids: set[str]) -> None:
         for item in activity:

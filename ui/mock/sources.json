@@ -1,69 +1,72 @@
 {
  "items": [
   {
-   "id": "claude_code_transcripts",
-   "kind": "transcripts",
-   "name": "Claude Code transcripts",
+   "id": "claude_code",
+   "display_name": "Claude Code transcripts",
+   "kind": "transcript",
+   "found": true,
    "enabled": true,
    "supported": true,
-   "found": true,
-   "path": "~/.claude/projects",
+   "error": null,
+   "paths": [
+    "~/.claude/projects/**/*.jsonl"
+   ],
    "files_watched": 12,
-   "lines_read": 4310,
-   "last_event_at": "2026-10-31T09:41:12",
-   "reads": "Conversation files in this folder, line by line.",
-   "stores": "Only masked findings.",
-   "error": null,
-   "detail": "12 files"
-  },
-  {
-   "id": "ollama_tap",
-   "kind": "ollama_tap",
-   "name": "Ollama tap",
-   "enabled": true,
-   "supported": true,
-   "found": true,
-   "listen": 11435,
-   "upstream": 11434,
-   "files_watched": null,
-   "lines_read": 98,
-   "last_event_at": "2026-10-31T09:27:44",
-   "reads": "Requests sent to this address.",
-   "stores": "Only masked findings.",
-   "error": null,
-   "detail": "98 requests"
+   "lines_ingested": 4310,
+   "last_event_at": "2026-10-31T09:41:12.000Z",
+   "reads": "Prompts, tool calls and tool results in these files, line by line.",
+   "stores": "Only masked findings."
   },
   {
    "id": "live_log",
+   "display_name": "Live log folder",
    "kind": "live_log",
-   "name": "Live log folder",
+   "found": true,
    "enabled": false,
    "supported": true,
-   "found": true,
-   "path": "~/shadowlens/logs",
-   "files_watched": 3,
-   "lines_read": 3210,
-   "last_event_at": null,
-   "reads": "Log files written here.",
-   "stores": "Only masked findings.",
    "error": null,
-   "detail": "3 files"
+   "paths": [
+    "data/live/*.jsonl"
+   ],
+   "files_watched": 3,
+   "lines_ingested": 3210,
+   "last_event_at": null,
+   "reads": "Log files written here, one request per line.",
+   "stores": "Only masked findings."
   },
   {
-   "id": "other_transcripts",
-   "kind": "transcripts",
-   "name": "Other transcript source",
-   "enabled": false,
-   "supported": false,
-   "found": false,
-   "path": "~/.example/history",
+   "id": "ollama_proxy",
+   "display_name": "Ollama tap",
+   "kind": "proxy",
+   "found": true,
+   "enabled": true,
+   "supported": true,
+   "error": null,
+   "paths": [
+    "127.0.0.1:11436 \u2192 127.0.0.1:11434"
+   ],
    "files_watched": 0,
-   "lines_read": 0,
+   "lines_ingested": 98,
+   "last_event_at": "2026-10-31T09:27:44.000Z",
+   "reads": "Requests sent to the tap's address, then forwarded unchanged.",
+   "stores": "Only masked findings."
+  },
+  {
+   "id": "browser_history",
+   "display_name": "AI websites open in the browser",
+   "kind": "browser",
+   "found": false,
+   "enabled": false,
+   "supported": true,
+   "error": null,
+   "paths": [
+    "Chrome, Edge, Brave, Chromium and Firefox history"
+   ],
+   "files_watched": 0,
+   "lines_ingested": 0,
    "last_event_at": null,
-   "reads": "Nothing yet.",
-   "stores": "Nothing.",
-   "error": "Not supported on this platform.",
-   "detail": "off"
+   "reads": "Page addresses and visit times from a copy of the browser's history, only for known AI sites.",
+   "stores": "Only that the site was visited (browser, site, time)."
   }
  ],
  "total": 4

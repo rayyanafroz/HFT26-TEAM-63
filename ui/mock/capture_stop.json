@@ -19,6 +19,20 @@
   "played": 0,
   "total": 0
  },
+ "transcripts": {
+  "enabled": false,
+  "sources_active": 0,
+  "files_watched": 0,
+  "lines_ingested": 4310
+ },
+ "proxy": {
+  "enabled": false,
+  "listen_port": 11436,
+  "upstream": "127.0.0.1:11434",
+  "upstream_ok": false,
+  "requests_ingested": 98,
+  "error": null
+ },
  "since": null,
- "stopped_at": null
+ "stopped_at": "2026-10-31T09:45:00.000Z"
 }

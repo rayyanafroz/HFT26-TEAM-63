@@ -30,4 +30,13 @@ export function cardError(message, onRetry) {
     el("button", { class: "linkbtn", type: "button", onClick: onRetry }, "Retry"));
 }
 
-export const alertHref = (id) => `#/alerts?alert=${encodeURIComponent(id)}`;
+/** What a source row (GET /api/sources) is counting: files for transcripts, requests for the tap, visits for browsers. */
+export const SOURCE_UNIT = { transcript: "lines", live_log: "lines", proxy: "requests", browser: "visits" };
+
+/** One short line for a source that is on, e.g. "3 files · 1,204 lines". */
+export function sourceDetail(s, fmtNumber) {
+  const n = `${fmtNumber(s.lines_ingested ?? 0)} ${SOURCE_UNIT[s.kind] ?? "lines"}`;
+  return s.kind === "transcript" || s.kind === "live_log" ? `${fmtNumber(s.files_watched ?? 0)} files · ${n}` : n;
+}
+
+export const alertHref =(id) => `#/alerts?alert=${encodeURIComponent(id)}`;
