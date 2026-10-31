@@ -1,0 +1,61 @@
+# Agent behavior rules (SOT 7.4). Rule ids and severities are frozen in SOT 6.5;
+# the patterns here can be tuned. Everything is matched case-insensitively.
+
+# Tool name -> capability (full match on the tool name).
+capabilities:
+  shell: '(?:bash|sh|zsh|shell|terminal|powershell|pwsh|cmd(?:_?exe)?|run_?(?:shell|command|terminal(?:_cmd)?|code)|exec(?:ute)?(?:_?command)?|subprocess|python_?repl)'
+  fs_read: '(?:read(?:_?file)?|cat|view(?:_?file)?|open(?:_?file)?|list_?(?:dir(?:ectory)?|files)|ls|glob|grep|find|search_?files|get_?file(?:_contents)?|str_?replace(?:_?editor|_based_edit_tool))'
+  fs_write: '(?:write(?:_?file)?|edit(?:_?file)?|multi_?edit|notebook_?edit|create_?file|str_?replace(?:_?editor|_based_edit_tool)?|apply_?patch|delete_?file|rm|mkdir|move_?file)'
+  network: '(?:fetch|http_?request|web_?fetch|web_?search|browse|curl|download|post_?request|send_?request)'
+
+dangerous_commands:
+  - '\brm\s+-[a-z]*(?:rf|fr)[a-z]*\s+(?:/|~|\$HOME|\*)'
+  - '\b(?:curl|wget)\b[^\n|]*\|\s*(?:sudo\s+)?(?:ba|z)?sh\b'
+  - '\bchmod\s+(?:-R\s+)?0?777\s+(?:/|~)'
+  - '\b(?:nc|ncat|netcat)\b[^\n]*\s-e\b'
+  - '/dev/tcp/'
+  - 'bash\s+-i\s*>&'
+  - '\bbase64\s+(?:-d|--decode)\b[^\n|]*\|\s*(?:ba)?sh\b'
+  - '\bdd\s+if=\S+\s+of=/dev/(?:sd|nvme|disk)'
+  - ':\(\)\s*\{\s*:\|:&\s*\};:'
+  - '\b(?:mkfs|shred)\b'
+  - '\b(?:Remove-Item|ri)\b[^\n]*-Recurse[^\n]*-Force'
+  - '\b(?:rd|rmdir)\s+/s\b'
+  - '\b(?:del|erase)\s+(?:/[fsq]\s*)+'
+  - '\b(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^\n|]*\|\s*(?:iex|Invoke-Expression)\b'
+  - '\b(?:powershell|pwsh)\b[^\n]*\s-(?:enc|encodedcommand)\s'
+  - '\bcertutil\b[^\n]*-urlcache'
+  - '\bformat\s+[A-Za-z]:'
+  - '\breg\s+(?:add|delete)\b[^\n]*\\(?:Run|RunOnce)\b'
+
+egress_commands:
+  - '\b(?:curl|wget)\b[^\n]*(?:\s-d\b|--data|--upload-file|\s-F\b|\s-T\b|-X\s*POST)'
+  - '\b(?:cat|printenv|env)\b[^\n|]*\|\s*(?:curl|wget|nc)\b'
+  - '\b(?:Invoke-WebRequest|iwr|Invoke-RestMethod|irm)\b[^\n]*(?:-Method\s+Post|-Body\b|-InFile\b)'
+  - '\b(?:type|Get-Content|gc|cat)\b[^\n|]*\|\s*(?:curl|iwr|Invoke-WebRequest|nc)\b'
+
+# A command that reaches the network counts as using the network capability,
+# even when no network tool was declared.
+network_commands:
+  - '\b(?:curl|wget|nc|ncat|netcat|iwr|irm|Invoke-WebRequest|Invoke-RestMethod|certutil)\b'
+
+sensitive_paths:
+  - '(?:~|/home/[^/\s"'']+|/Users/[^/\s"'']+|/root)/\.(?:ssh|aws|gnupg|kube|docker)(?:/|\b)'
+  # .env.example and friends hold no secrets. The end also accepts shell punctuation ("cat .env;").
+  - '(?:^|[\s/\\"''])\.env(?!\.(?:example|sample|template))(?:\.[A-Za-z0-9_\-]+)?(?=$|[\s"'';|&)])'
+  - '\bid_(?:rsa|ed25519|ecdsa)\b'
+  - '/etc/(?:passwd|shadow|sudoers)\b'
+  - '\.git-credentials\b'
+  - '\.npmrc\b'
+  - '\.pypirc\b'
+  - 'service[_\-]account[^\s"'']*\.json'
+  - '(?:%USERPROFILE%|\$env:USERPROFILE|\$HOME)[\\/]\.(?:ssh|aws|gnupg|kube|docker)(?:[\\/]|\b)'
+  - '[A-Za-z]:[\\/]Users[\\/][^\\/\s"'']+[\\/]\.(?:ssh|aws|gnupg|kube|docker)(?:[\\/]|\b)'
+  - '\bNTUSER\.DAT\b'
+  - '[A-Za-z]:[\\/]Windows[\\/]System32[\\/]config[\\/](?:SAM|SYSTEM|SECURITY)\b'
+  # Spaces are allowed: Chrome keeps these under "User Data".
+  - 'AppData[\\/](?:Roaming|Local)[\\/][^"''\n]*(?:Credentials|Login Data|Cookies)'
+
+# First word of a command that only looks at things (AGENT_SHELL_EXEC drops to medium).
+read_only_commands: [ls, pwd, whoami, date, echo, cat, head, tail, wc, grep, find, dir, type, where, findstr, get-childitem, get-location]
+read_only_git: [status, log, diff]
