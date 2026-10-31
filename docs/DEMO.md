@@ -47,6 +47,36 @@ The requests were written ahead of time (`scenarios/generate.py`), with fake key
 The detection, scoring, storage and feed that process them are the real application. Say so when
 presenting them; they are labelled `[REPLAY]` on screen.
 
+## Two laptops: a friend types a key into Claude Code (W5)
+
+ShadowLens reads what a tool writes on the machine it runs on, and Claude Code writes its transcript
+on its own machine. `scenarios/remote_demo.py` carries that transcript to the laptop running
+ShadowLens. It is a demo stand-in for running ShadowLens on the other machine, and you say so.
+
+```powershell
+# laptop A (ShadowLens running): prints the exact command for laptop B, with a one-time token
+.venv\Scripts\python -m scenarios.remote_demo relay
+
+# laptop B (Claude Code): copy scenarios\remote_demo.py over; it needs only Python, no install
+python remote_demo.py forward --to http://<address printed on A>:8800 --token <token printed on A>
+```
+
+Then your friend types a **fake** key into Claude Code on laptop B (use the Leak Lab sample button on
+A, or `python -c "from shadowlens.fakes import fake; print(fake('openai_key', 1))"`). The finding appears
+in A's live feed and score within a few seconds. Measure it once with a stopwatch before the demo.
+
+| Part | Behaviour |
+|---|---|
+| Forwarder (B) | Read-only. Starts at the **end** of every transcript under `~/.claude/projects`, so only what is typed after it starts is sent. Keeps lines and retries if the relay is unreachable. `--backfill` also sends history |
+| Relay (A) | The only thing listening on the network (port 8800, needs the token). Hands the lines to ShadowLens on `127.0.0.1`; the API itself stays local. Keeps what the user typed, tool results and the agent's actions; drops the agent's prose (SOT 7.2.1) |
+| What is stored | Same as any event: masked findings only. The relay prints counts, never content |
+
+Use your phone's hotspot (venue Wi-Fi often isolates devices) and allow Python through the Windows
+Firewall when asked. The token travels unencrypted on that network, so use it with fake keys only.
+If the network fails, the fallback is the friend typing on laptop A, or `scenarios.transcript_sim`.
+Events arrive as `http_log`, so there is no "Claude Code (live)" source chip until Rayyan's transcript
+source is merged. Tests: `tests/test_remote_demo.py`.
+
 ## What the live steps can and cannot show
 
 `laptop` reads the machine, so its list is whatever is really there. It cannot see Python/Node packages,
