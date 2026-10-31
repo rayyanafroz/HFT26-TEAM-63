@@ -1,0 +1,24 @@
+{
+ "mode": "idle",
+ "scan": {
+  "enabled": false,
+  "interval_s": 5,
+  "last_scan_at": "2026-10-31T09:41:10",
+  "scope": "own_user",
+  "privileged": false,
+  "psutil_ok": true
+ },
+ "live_tail": {
+  "enabled": false,
+  "dir": "",
+  "lines_ingested": 0
+ },
+ "platform": "darwin",
+ "scenario": {
+  "name": null,
+  "played": 0,
+  "total": 0
+ },
+ "since": null,
+ "stopped_at": null
+}

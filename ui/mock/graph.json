@@ -1,0 +1,165 @@
+{
+ "nodes": [
+  {
+   "id": "proc:claude-code",
+   "kind": "process",
+   "label": "Claude Code",
+   "risk": 64,
+   "risk_band": "high",
+   "sanctioned": null
+  },
+  {
+   "id": "proc:cursor-agent",
+   "kind": "process",
+   "label": "Cursor Agent",
+   "risk": 58,
+   "risk_band": "high",
+   "sanctioned": null
+  },
+  {
+   "id": "proc:chatgpt-desktop",
+   "kind": "process",
+   "label": "ChatGPT Desktop",
+   "risk": 41,
+   "risk_band": "moderate",
+   "sanctioned": null
+  },
+  {
+   "id": "proc:aider",
+   "kind": "process",
+   "label": "Aider",
+   "risk": 62,
+   "risk_band": "high",
+   "sanctioned": null
+  },
+  {
+   "id": "proc:gemini-cli",
+   "kind": "process",
+   "label": "Gemini CLI",
+   "risk": 18,
+   "risk_band": "low",
+   "sanctioned": null
+  },
+  {
+   "id": "proc:ollama-client",
+   "kind": "process",
+   "label": "Ollama client",
+   "risk": 9,
+   "risk_band": "low",
+   "sanctioned": null
+  },
+  {
+   "id": "prov:openai",
+   "kind": "provider",
+   "label": "OpenAI",
+   "risk": 0,
+   "risk_band": "low",
+   "sanctioned": false
+  },
+  {
+   "id": "prov:anthropic",
+   "kind": "provider",
+   "label": "Anthropic",
+   "risk": 0,
+   "risk_band": "low",
+   "sanctioned": true
+  },
+  {
+   "id": "prov:google-gemini",
+   "kind": "provider",
+   "label": "Google Gemini",
+   "risk": 0,
+   "risk_band": "low",
+   "sanctioned": false
+  },
+  {
+   "id": "prov:mistral",
+   "kind": "provider",
+   "label": "Mistral",
+   "risk": 0,
+   "risk_band": "low",
+   "sanctioned": false
+  },
+  {
+   "id": "prov:ollama",
+   "kind": "provider",
+   "label": "Ollama (local)",
+   "risk": 0,
+   "risk_band": "low",
+   "sanctioned": true
+  },
+  {
+   "id": "prov:featherless",
+   "kind": "provider",
+   "label": "Featherless",
+   "risk": 0,
+   "risk_band": "low",
+   "sanctioned": false
+  }
+ ],
+ "edges": [
+  {
+   "source": "proc:claude-code",
+   "target": "prov:anthropic",
+   "tool_id": "claude-code",
+   "event_count": 241,
+   "bytes_out": null,
+   "max_severity": "critical",
+   "has_finding": true
+  },
+  {
+   "source": "proc:cursor-agent",
+   "target": "prov:openai",
+   "tool_id": "cursor-agent",
+   "event_count": 171,
+   "bytes_out": null,
+   "max_severity": "critical",
+   "has_finding": true
+  },
+  {
+   "source": "proc:chatgpt-desktop",
+   "target": "prov:openai",
+   "tool_id": "chatgpt-desktop",
+   "event_count": 70,
+   "bytes_out": null,
+   "max_severity": "high",
+   "has_finding": true
+  },
+  {
+   "source": "proc:cursor-agent",
+   "target": "prov:featherless",
+   "tool_id": "cursor-agent",
+   "event_count": 58,
+   "bytes_out": null,
+   "max_severity": null,
+   "has_finding": false
+  },
+  {
+   "source": "proc:aider",
+   "target": "prov:mistral",
+   "tool_id": "aider",
+   "event_count": 58,
+   "bytes_out": null,
+   "max_severity": "high",
+   "has_finding": true
+  },
+  {
+   "source": "proc:gemini-cli",
+   "target": "prov:google-gemini",
+   "tool_id": "gemini-cli",
+   "event_count": 140,
+   "bytes_out": null,
+   "max_severity": "medium",
+   "has_finding": false
+  },
+  {
+   "source": "proc:ollama-client",
+   "target": "prov:ollama",
+   "tool_id": "ollama-client",
+   "event_count": 154,
+   "bytes_out": null,
+   "max_severity": null,
+   "has_finding": false
+  }
+ ]
+}

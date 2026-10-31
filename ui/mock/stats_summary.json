@@ -1,0 +1,81 @@
+{
+ "risk": {
+  "org_risk": 52,
+  "band": "high",
+  "compliance_score": 48
+ },
+ "totals": {
+  "events": 1284,
+  "ai_events": 612,
+  "dropped_non_ai": 672,
+  "tools": 7,
+  "providers": 6,
+  "alerts_open": 9,
+  "findings": 14
+ },
+ "alerts_by_severity": {
+  "critical": 2,
+  "high": 3,
+  "medium": 3,
+  "low": 1
+ },
+ "findings_by_category": {
+  "secret": 4,
+  "pii": 3,
+  "code": 2,
+  "agent": 4,
+  "policy": 1
+ },
+ "events_by_provider": [
+  {
+   "provider_id": "openai",
+   "display_name": "OpenAI",
+   "count": 412
+  },
+  {
+   "provider_id": "anthropic",
+   "display_name": "Anthropic",
+   "count": 366
+  },
+  {
+   "provider_id": "google-gemini",
+   "display_name": "Google Gemini",
+   "count": 198
+  },
+  {
+   "provider_id": "ollama",
+   "display_name": "Ollama (local)",
+   "count": 154
+  },
+  {
+   "provider_id": "mistral",
+   "display_name": "Mistral",
+   "count": 96
+  },
+  {
+   "provider_id": "featherless",
+   "display_name": "Featherless",
+   "count": 58
+  }
+ ],
+ "unsanctioned_tools": 3,
+ "coverage": {
+  "full": 792,
+  "metadata_only": 492
+ },
+ "top_tools": [
+  {
+   "tool_id": "claude-code",
+   "risk": 64,
+   "risk_band": "high"
+  }
+ ],
+ "llm": {
+  "mode": "llm",
+  "sent": 14,
+  "blocked": 2,
+  "failed": 0
+ },
+ "scenario": "full_demo",
+ "last_event_at": "2026-10-31T09:41:12"
+}

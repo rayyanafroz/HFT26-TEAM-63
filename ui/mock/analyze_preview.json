@@ -1,0 +1,46 @@
+{
+ "findings": [
+  {
+   "rule_id": "SEC_AWS_SECRET_KEY",
+   "category": "secret",
+   "severity": "critical",
+   "title": "AWS secret key",
+   "masked_preview": "\u2022\u2022\u2022\u20220000",
+   "confidence": 0.98,
+   "span": [
+    19,
+    63
+   ]
+  },
+  {
+   "rule_id": "PII_EMAIL",
+   "category": "pii",
+   "severity": "low",
+   "title": "Email address",
+   "masked_preview": "j\u2022\u2022\u2022\u2022@example.com",
+   "confidence": 0.91,
+   "span": [
+    87,
+    109
+   ]
+  },
+  {
+   "rule_id": "PII_CREDIT_CARD",
+   "category": "pii",
+   "severity": "high",
+   "title": "Card number",
+   "masked_preview": "4111 \u2022\u2022\u2022\u2022 1111",
+   "confidence": 0.95,
+   "span": [
+    127,
+    146
+   ]
+  }
+ ],
+ "redacted_text": "Please deploy with AWS_SECRET_ACCESS_KEY=[REDACTED] and mail the report to [REDACTED_EMAIL]. The customer is [REDACTED_CARD].",
+ "would_block": true,
+ "points_preview": {
+  "S": 54.0,
+  "tool_score": 54
+ }
+}

@@ -1,0 +1,89 @@
+{
+ "items": [
+  {
+   "provider_id": "openai",
+   "display_name": "OpenAI",
+   "category": "cloud_llm",
+   "sanctioned": false,
+   "sanction_source": "default",
+   "seen": true,
+   "confirmed": true,
+   "event_count": 412,
+   "tool_count": 3,
+   "last_seen": "2026-10-31T09:41:12"
+  },
+  {
+   "provider_id": "anthropic",
+   "display_name": "Anthropic",
+   "category": "cloud_llm",
+   "sanctioned": true,
+   "sanction_source": "default",
+   "seen": true,
+   "confirmed": true,
+   "event_count": 366,
+   "tool_count": 2,
+   "last_seen": "2026-10-31T09:40:48"
+  },
+  {
+   "provider_id": "google-gemini",
+   "display_name": "Google Gemini",
+   "category": "cloud_llm",
+   "sanctioned": false,
+   "sanction_source": "default",
+   "seen": true,
+   "confirmed": true,
+   "event_count": 198,
+   "tool_count": 1,
+   "last_seen": "2026-10-31T09:30:02"
+  },
+  {
+   "provider_id": "ollama",
+   "display_name": "Ollama (local)",
+   "category": "local_llm",
+   "sanctioned": true,
+   "sanction_source": "default",
+   "seen": true,
+   "confirmed": true,
+   "event_count": 154,
+   "tool_count": 1,
+   "last_seen": "2026-10-31T09:27:44"
+  },
+  {
+   "provider_id": "mistral",
+   "display_name": "Mistral",
+   "category": "cloud_llm",
+   "sanctioned": false,
+   "sanction_source": "default",
+   "seen": true,
+   "confirmed": false,
+   "event_count": 96,
+   "tool_count": 1,
+   "last_seen": "2026-10-31T09:35:51"
+  },
+  {
+   "provider_id": "featherless",
+   "display_name": "Featherless",
+   "category": "cloud_llm",
+   "sanctioned": false,
+   "sanction_source": "default",
+   "seen": true,
+   "confirmed": false,
+   "event_count": 58,
+   "tool_count": 1,
+   "last_seen": "2026-10-31T09:12:31"
+  },
+  {
+   "provider_id": "huggingface",
+   "display_name": "Hugging Face",
+   "category": "model_hub",
+   "sanctioned": false,
+   "sanction_source": "default",
+   "seen": false,
+   "confirmed": false,
+   "event_count": 0,
+   "tool_count": 0,
+   "last_seen": null
+  }
+ ],
+ "total": 7
+}

@@ -1,0 +1,14 @@
+{
+ "id": "a1b2c3d4-0000-4000-8000-000000000002",
+ "finding_id": "f1b2c3d4-0000-4000-8000-000000000002",
+ "tool_id": "cursor-agent",
+ "provider_id": "openai",
+ "rule_id": "AGENT_DANGEROUS_CMD",
+ "severity": "critical",
+ "title": "Agent ran a shell it was not granted",
+ "status": "acked",
+ "created_at": "2026-10-31T09:40:48",
+ "acked_at": "2026-10-31T09:45:00",
+ "source": "live_log",
+ "remediation": null
+}

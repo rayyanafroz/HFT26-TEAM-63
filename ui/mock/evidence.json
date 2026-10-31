@@ -1,0 +1,76 @@
+{
+ "available": true,
+ "generated_at": "2026-10-31T08:55:00",
+ "metrics": [
+  {
+   "id": "recall",
+   "label": "Recall",
+   "value": 0.96,
+   "target": 0.9,
+   "unit": "",
+   "pass": true,
+   "fixture": "payloads_labeled.jsonl",
+   "command": "python -m shadowlens.eval.run"
+  },
+  {
+   "id": "fp",
+   "label": "False positives",
+   "value": 0.02,
+   "target": 0.05,
+   "unit": "",
+   "pass": true,
+   "fixture": "payloads_labeled.jsonl",
+   "command": "python -m shadowlens.eval.run"
+  },
+  {
+   "id": "prov",
+   "label": "Provider accuracy",
+   "value": 0.94,
+   "target": 0.9,
+   "unit": "",
+   "pass": true,
+   "fixture": "providers_labeled.jsonl",
+   "command": "python -m shadowlens.eval.run"
+  },
+  {
+   "id": "agent",
+   "label": "Agent rules hit",
+   "value": 7,
+   "target": 8,
+   "unit": "of 8",
+   "pass": false,
+   "fixture": "agents.jsonl",
+   "command": "python -m shadowlens.eval.run"
+  },
+  {
+   "id": "leaks",
+   "label": "No raw secret leaks",
+   "value": 0,
+   "target": 0,
+   "unit": "found",
+   "pass": true,
+   "fixture": "db scan",
+   "command": "python -m shadowlens.eval.run"
+  },
+  {
+   "id": "eps",
+   "label": "Events per second",
+   "value": 410,
+   "target": 200,
+   "unit": "",
+   "pass": true,
+   "fixture": "bench",
+   "command": "python -m shadowlens.eval.run"
+  },
+  {
+   "id": "p95",
+   "label": "p95 latency",
+   "value": 38,
+   "target": 100,
+   "unit": "ms",
+   "pass": true,
+   "fixture": "bench",
+   "command": "python -m shadowlens.eval.run"
+  }
+ ]
+}

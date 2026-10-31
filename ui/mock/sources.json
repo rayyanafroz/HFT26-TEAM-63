@@ -1,0 +1,70 @@
+{
+ "items": [
+  {
+   "id": "claude_code_transcripts",
+   "kind": "transcripts",
+   "name": "Claude Code transcripts",
+   "enabled": true,
+   "supported": true,
+   "found": true,
+   "path": "~/.claude/projects",
+   "files_watched": 12,
+   "lines_read": 4310,
+   "last_event_at": "2026-10-31T09:41:12",
+   "reads": "Conversation files in this folder, line by line.",
+   "stores": "Only masked findings.",
+   "error": null,
+   "detail": "12 files"
+  },
+  {
+   "id": "ollama_tap",
+   "kind": "ollama_tap",
+   "name": "Ollama tap",
+   "enabled": true,
+   "supported": true,
+   "found": true,
+   "listen": 11435,
+   "upstream": 11434,
+   "files_watched": null,
+   "lines_read": 98,
+   "last_event_at": "2026-10-31T09:27:44",
+   "reads": "Requests sent to this address.",
+   "stores": "Only masked findings.",
+   "error": null,
+   "detail": "98 requests"
+  },
+  {
+   "id": "live_log",
+   "kind": "live_log",
+   "name": "Live log folder",
+   "enabled": false,
+   "supported": true,
+   "found": true,
+   "path": "~/shadowlens/logs",
+   "files_watched": 3,
+   "lines_read": 3210,
+   "last_event_at": null,
+   "reads": "Log files written here.",
+   "stores": "Only masked findings.",
+   "error": null,
+   "detail": "3 files"
+  },
+  {
+   "id": "other_transcripts",
+   "kind": "transcripts",
+   "name": "Other transcript source",
+   "enabled": false,
+   "supported": false,
+   "found": false,
+   "path": "~/.example/history",
+   "files_watched": 0,
+   "lines_read": 0,
+   "last_event_at": null,
+   "reads": "Nothing yet.",
+   "stores": "Nothing.",
+   "error": "Not supported on this platform.",
+   "detail": "off"
+  }
+ ],
+ "total": 4
+}

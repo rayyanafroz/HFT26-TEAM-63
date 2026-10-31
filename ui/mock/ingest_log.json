@@ -1,0 +1,1 @@
+{"source": "upload", "accepted": 482, "skipped": 6, "dropped_non_ai": 31, "findings": 14, "alerts": 9, "errors": ["line 214: not valid JSON, skipped", "line 390: missing timestamp, skipped"]}
