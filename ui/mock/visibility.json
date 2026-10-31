@@ -1,0 +1,41 @@
+{
+ "statement": "Payload inspection only applies to events with full visibility. HTTPS traffic is reported as metadata only.",
+ "rows": [
+  {
+   "source": "Live log folder",
+   "can_see": "Request and response bodies written by tools",
+   "cannot_see": "Traffic that is not logged",
+   "visibility": "full"
+  },
+  {
+   "source": "Claude Code transcripts",
+   "can_see": "Prompts, replies, tool calls",
+   "cannot_see": "Anything not saved to disk",
+   "visibility": "full"
+  },
+  {
+   "source": "Ollama tap",
+   "can_see": "Local model requests and replies",
+   "cannot_see": "Other model servers",
+   "visibility": "full"
+  },
+  {
+   "source": "Connection scan",
+   "can_see": "Which processes talk to which hosts",
+   "cannot_see": "Payload contents",
+   "visibility": "metadata_only"
+  },
+  {
+   "source": "Uploaded .jsonl or .har",
+   "can_see": "Whatever the file records",
+   "cannot_see": "What was not exported",
+   "visibility": "full"
+  },
+  {
+   "source": "PCAP upload (not built)",
+   "can_see": "Destinations and sizes",
+   "cannot_see": "Encrypted contents",
+   "visibility": "metadata_only"
+  }
+ ]
+}

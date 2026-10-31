@@ -1,0 +1,23 @@
+{
+ "mode": "watching",
+ "scan": {
+  "enabled": true,
+  "interval_s": 5,
+  "last_scan_at": "2026-10-31T09:41:10",
+  "scope": "own_user",
+  "privileged": false,
+  "psutil_ok": true
+ },
+ "live_tail": {
+  "enabled": true,
+  "dir": "~/shadowlens/logs",
+  "lines_ingested": 3210
+ },
+ "platform": "darwin",
+ "scenario": {
+  "name": "full_demo",
+  "played": 112,
+  "total": 160
+ },
+ "since": "2026-10-31T09:12:04"
+}

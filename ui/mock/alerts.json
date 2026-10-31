@@ -1,0 +1,461 @@
+{
+ "items": [
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000001",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000001",
+   "tool_id": "claude-code",
+   "provider_id": "anthropic",
+   "rule_id": "SEC_AWS_SECRET_KEY",
+   "severity": "critical",
+   "title": "AWS secret key sent in a prompt",
+   "status": "open",
+   "created_at": "2026-10-31T09:41:12",
+   "acked_at": null,
+   "source": "transcript",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000001",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000001",
+    "tool_id": "claude-code",
+    "rule_id": "SEC_AWS_SECRET_KEY",
+    "category": "secret",
+    "severity": "critical",
+    "confidence": 0.9,
+    "masked_preview": "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022x9Qz",
+    "location": {
+     "field": "body",
+     "offset": null
+    },
+    "owasp": [
+     "LLM02"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000001",
+     "spans": [],
+     "context": "export AWS_SECRET_ACCESS_KEY=[REDACTED] then run the deploy",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:41:12",
+    "source": "transcript"
+   },
+   "remediation": {
+    "id": "r1",
+    "alert_id": "a1b2c3d4-0000-4000-8000-000000000001",
+    "summary": "Rotate the key now, then remove it from the transcript and shell history. Use a secrets manager for future sessions.",
+    "steps": [],
+    "sensitivity": "high",
+    "verdict": "true_positive",
+    "data_classes": [
+     "credential"
+    ],
+    "source": "llm",
+    "model": "triage-model",
+    "latency_ms": 840,
+    "redaction_check": "passed",
+    "prompt_text": "Alert: SEC_AWS_SECRET_KEY, severity critical.\nContext: export AWS_SECRET_ACCESS_KEY=[REDACTED] then run the deploy\nTool: Claude Code. Location: body.",
+    "created_at": "2026-10-31T09:41:14"
+   }
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000002",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000002",
+   "tool_id": "cursor-agent",
+   "provider_id": "openai",
+   "rule_id": "AGENT_DANGEROUS_CMD",
+   "severity": "critical",
+   "title": "Agent ran a shell it was not granted",
+   "status": "open",
+   "created_at": "2026-10-31T09:40:48",
+   "acked_at": null,
+   "source": "live_log",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000002",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000002",
+    "tool_id": "cursor-agent",
+    "rule_id": "AGENT_DANGEROUS_CMD",
+    "category": "agent",
+    "severity": "critical",
+    "confidence": 0.9,
+    "masked_preview": "bash -c \"curl \u2026\"",
+    "location": {
+     "field": "tool_call",
+     "offset": null
+    },
+    "owasp": [
+     "LLM06"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000002",
+     "spans": [],
+     "context": "bash -c \"curl [REDACTED] | sh\"",
+     "in_tool_args": true
+    },
+    "created_at": "2026-10-31T09:40:48",
+    "source": "live_log"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000003",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000003",
+   "tool_id": "chatgpt-desktop",
+   "provider_id": "openai",
+   "rule_id": "PII_BULK",
+   "severity": "high",
+   "title": "Customer email list pasted into chat",
+   "status": "open",
+   "created_at": "2026-10-31T09:38:05",
+   "acked_at": null,
+   "source": "http_log",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000003",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000003",
+    "tool_id": "chatgpt-desktop",
+    "rule_id": "PII_BULK",
+    "category": "pii",
+    "severity": "high",
+    "confidence": 0.9,
+    "masked_preview": "213 email addresses",
+    "location": {
+     "field": "body",
+     "offset": null
+    },
+    "owasp": [
+     "LLM02"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000003",
+     "spans": [],
+     "context": "name, email: [REDACTED] (+213 rows)",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:38:05",
+    "source": "http_log"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000004",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000004",
+   "tool_id": "aider",
+   "provider_id": "mistral",
+   "rule_id": "POLICY_UNSANCTIONED_TOOL",
+   "severity": "high",
+   "title": "Unapproved tool sending project files",
+   "status": "open",
+   "created_at": "2026-10-31T09:35:51",
+   "acked_at": null,
+   "source": "conn_scan",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000004",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000004",
+    "tool_id": "aider",
+    "rule_id": "POLICY_UNSANCTIONED_TOOL",
+    "category": "policy",
+    "severity": "high",
+    "confidence": 0.9,
+    "masked_preview": "aider \u00b7 mistral",
+    "location": {
+     "field": "body",
+     "offset": null
+    },
+    "owasp": [
+     "LLM03"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000004",
+     "spans": [],
+     "context": "aider \u2192 api.mistral.ai, 14 files",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:35:51",
+    "source": "conn_scan"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000005",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000005",
+   "tool_id": "cursor-agent",
+   "provider_id": "openai",
+   "rule_id": "AGENT_SENSITIVE_FILE_READ",
+   "severity": "high",
+   "title": "Private key read, then sent over the network",
+   "status": "acked",
+   "created_at": "2026-10-31T09:33:20",
+   "acked_at": "2026-10-31T09:42:00",
+   "source": "live_log",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000005",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000005",
+    "tool_id": "cursor-agent",
+    "rule_id": "AGENT_SENSITIVE_FILE_READ",
+    "category": "agent",
+    "severity": "high",
+    "confidence": 0.9,
+    "masked_preview": "~/.ssh/\u2022\u2022\u2022\u2022\u2022\u2022",
+    "location": {
+     "field": "tool_call",
+     "offset": null
+    },
+    "owasp": [
+     "LLM06"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000005",
+     "spans": [],
+     "context": "read_file ~/.ssh/[REDACTED]",
+     "in_tool_args": true
+    },
+    "created_at": "2026-10-31T09:33:20",
+    "source": "live_log"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000006",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000006",
+   "tool_id": "gemini-cli",
+   "provider_id": "google-gemini",
+   "rule_id": "PII_INTERNAL_HOST",
+   "severity": "medium",
+   "title": "Internal hostname in a prompt",
+   "status": "open",
+   "created_at": "2026-10-31T09:30:02",
+   "acked_at": null,
+   "source": "transcript",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000006",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000006",
+    "tool_id": "gemini-cli",
+    "rule_id": "PII_INTERNAL_HOST",
+    "category": "pii",
+    "severity": "medium",
+    "confidence": 0.9,
+    "masked_preview": "\u2022\u2022\u2022\u2022.corp.internal",
+    "location": {
+     "field": "body",
+     "offset": null
+    },
+    "owasp": [
+     "LLM02"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000006",
+     "spans": [],
+     "context": "connect to [REDACTED].corp.internal on 5432",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:30:02",
+    "source": "transcript"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000007",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000007",
+   "tool_id": "ollama-client",
+   "provider_id": "ollama",
+   "rule_id": "POLICY_LOCAL_LLM",
+   "severity": "medium",
+   "title": "Unapproved provider seen",
+   "status": "open",
+   "created_at": "2026-10-31T09:27:44",
+   "acked_at": null,
+   "source": "ollama_tap",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000007",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000007",
+    "tool_id": "ollama-client",
+    "rule_id": "POLICY_LOCAL_LLM",
+    "category": "policy",
+    "severity": "medium",
+    "confidence": 0.9,
+    "masked_preview": "local model",
+    "location": {
+     "field": "path",
+     "offset": null
+    },
+    "owasp": [
+     "LLM03"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000007",
+     "spans": [],
+     "context": "POST /api/chat model llama3",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:27:44",
+    "source": "ollama_tap"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000008",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000008",
+   "tool_id": "copilot",
+   "provider_id": "openai",
+   "rule_id": "SEC_GENERIC_ASSIGNMENT",
+   "severity": "medium",
+   "title": "Access token in request header",
+   "status": "acked",
+   "created_at": "2026-10-31T09:21:09",
+   "acked_at": "2026-10-31T09:42:00",
+   "source": "http_log",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000008",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000008",
+    "tool_id": "copilot",
+    "rule_id": "SEC_GENERIC_ASSIGNMENT",
+    "category": "secret",
+    "severity": "medium",
+    "confidence": 0.9,
+    "masked_preview": "Bearer \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
+    "location": {
+     "field": "header:authorization",
+     "offset": null
+    },
+    "owasp": [
+     "LLM02"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000008",
+     "spans": [],
+     "context": "Authorization: Bearer [REDACTED]",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:21:09",
+    "source": "http_log"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000009",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000009",
+   "tool_id": "claude-code",
+   "provider_id": "anthropic",
+   "rule_id": "PII_EMAIL",
+   "severity": "low",
+   "title": "Personal email in a prompt",
+   "status": "open",
+   "created_at": "2026-10-31T09:14:36",
+   "acked_at": null,
+   "source": "transcript",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000009",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000009",
+    "tool_id": "claude-code",
+    "rule_id": "PII_EMAIL",
+    "category": "pii",
+    "severity": "low",
+    "confidence": 0.9,
+    "masked_preview": "p\u2022\u2022\u2022\u2022@\u2022\u2022\u2022\u2022.com",
+    "location": {
+     "field": "body",
+     "offset": null
+    },
+    "owasp": [
+     "LLM02"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000009",
+     "spans": [],
+     "context": "send the report to [REDACTED]",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:14:36",
+    "source": "transcript"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000010",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000010",
+   "tool_id": "claude-code",
+   "provider_id": "anthropic",
+   "rule_id": "SEC_DB_URL",
+   "severity": "high",
+   "title": "Database URL in a prompt",
+   "status": "acked",
+   "created_at": "2026-10-31T09:10:31",
+   "acked_at": "2026-10-31T09:42:00",
+   "source": "transcript",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000010",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000010",
+    "tool_id": "claude-code",
+    "rule_id": "SEC_DB_URL",
+    "category": "secret",
+    "severity": "high",
+    "confidence": 0.9,
+    "masked_preview": "postgres://\u2022\u2022\u2022\u2022",
+    "location": {
+     "field": "body",
+     "offset": null
+    },
+    "owasp": [
+     "LLM02"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000010",
+     "spans": [],
+     "context": "DATABASE_URL=[REDACTED]",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:10:31",
+    "source": "transcript"
+   },
+   "remediation": null
+  },
+  {
+   "id": "a1b2c3d4-0000-4000-8000-000000000011",
+   "finding_id": "f1b2c3d4-0000-4000-8000-000000000011",
+   "tool_id": "gemini-cli",
+   "provider_id": "google-gemini",
+   "rule_id": "PII_PHONE",
+   "severity": "low",
+   "title": "Phone number in a prompt",
+   "status": "acked",
+   "created_at": "2026-10-31T09:05:09",
+   "acked_at": "2026-10-31T09:42:00",
+   "source": "transcript",
+   "finding": {
+    "id": "f1b2c3d4-0000-4000-8000-000000000011",
+    "event_id": "e1b2c3d4-0000-4000-8000-000000000011",
+    "tool_id": "gemini-cli",
+    "rule_id": "PII_PHONE",
+    "category": "pii",
+    "severity": "low",
+    "confidence": 0.9,
+    "masked_preview": "+91 \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
+    "location": {
+     "field": "body",
+     "offset": null
+    },
+    "owasp": [
+     "LLM02"
+    ],
+    "controls": [],
+    "meta": {
+     "hash12": "h00000000011",
+     "spans": [],
+     "context": "call me on [REDACTED]",
+     "in_tool_args": false
+    },
+    "created_at": "2026-10-31T09:05:09",
+    "source": "transcript"
+   },
+   "remediation": null
+  }
+ ],
+ "total": 11
+}

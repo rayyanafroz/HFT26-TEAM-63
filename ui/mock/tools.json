@@ -1,0 +1,477 @@
+{
+ "items": [
+  {
+   "tool_id": "claude-code",
+   "process": "claude-code",
+   "provider_id": "anthropic",
+   "display_name": "Claude Code",
+   "category": "cloud_llm",
+   "sanctioned": true,
+   "confidence": "high",
+   "event_count": 0,
+   "bytes_out": null,
+   "first_seen": "2026-10-31T09:12:04",
+   "last_seen": "2026-10-31T09:41:12",
+   "risk": 64,
+   "risk_band": "high",
+   "finding_counts": {
+    "critical": 1,
+    "high": 1,
+    "medium": 1,
+    "low": 1,
+    "info": 0
+   },
+   "capabilities": {
+    "shell": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_read": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_write": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "network": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "mcp": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "sensitive_file": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    }
+   },
+   "visibility": {
+    "full": 62,
+    "metadata_only": 38
+   },
+   "unconfirmed": false
+  },
+  {
+   "tool_id": "cursor-agent",
+   "process": "cursor-agent",
+   "provider_id": "openai",
+   "display_name": "Cursor Agent",
+   "category": "cloud_llm",
+   "sanctioned": true,
+   "confidence": "high",
+   "event_count": 0,
+   "bytes_out": null,
+   "first_seen": "2026-10-31T09:12:04",
+   "last_seen": "2026-10-31T09:41:12",
+   "risk": 58,
+   "risk_band": "high",
+   "finding_counts": {
+    "critical": 1,
+    "high": 1,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+   },
+   "capabilities": {
+    "shell": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_read": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_write": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "network": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "mcp": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "sensitive_file": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    }
+   },
+   "visibility": {
+    "full": 62,
+    "metadata_only": 38
+   },
+   "unconfirmed": false
+  },
+  {
+   "tool_id": "chatgpt-desktop",
+   "process": "chatgpt-desktop",
+   "provider_id": "openai",
+   "display_name": "ChatGPT Desktop",
+   "category": "cloud_llm",
+   "sanctioned": true,
+   "confidence": "high",
+   "event_count": 0,
+   "bytes_out": null,
+   "first_seen": "2026-10-31T09:12:04",
+   "last_seen": "2026-10-31T09:41:12",
+   "risk": 41,
+   "risk_band": "moderate",
+   "finding_counts": {
+    "critical": 0,
+    "high": 1,
+    "medium": 1,
+    "low": 0,
+    "info": 0
+   },
+   "capabilities": {
+    "shell": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_read": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_write": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "network": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "mcp": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "sensitive_file": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    }
+   },
+   "visibility": {
+    "full": 62,
+    "metadata_only": 38
+   },
+   "unconfirmed": false
+  },
+  {
+   "tool_id": "aider",
+   "process": "aider",
+   "provider_id": "mistral",
+   "display_name": "Aider",
+   "category": "cloud_llm",
+   "sanctioned": false,
+   "confidence": "high",
+   "event_count": 0,
+   "bytes_out": null,
+   "first_seen": "2026-10-31T09:12:04",
+   "last_seen": "2026-10-31T09:41:12",
+   "risk": 62,
+   "risk_band": "high",
+   "finding_counts": {
+    "critical": 0,
+    "high": 1,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+   },
+   "capabilities": {
+    "shell": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_read": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_write": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "network": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "mcp": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "sensitive_file": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    }
+   },
+   "visibility": {
+    "full": 62,
+    "metadata_only": 38
+   },
+   "unconfirmed": false
+  },
+  {
+   "tool_id": "gemini-cli",
+   "process": "gemini-cli",
+   "provider_id": "google-gemini",
+   "display_name": "Gemini CLI",
+   "category": "cloud_llm",
+   "sanctioned": false,
+   "confidence": "high",
+   "event_count": 0,
+   "bytes_out": null,
+   "first_seen": "2026-10-31T09:12:04",
+   "last_seen": "2026-10-31T09:41:12",
+   "risk": 18,
+   "risk_band": "low",
+   "finding_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 1,
+    "info": 0
+   },
+   "capabilities": {
+    "shell": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_read": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_write": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "network": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "mcp": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "sensitive_file": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    }
+   },
+   "visibility": {
+    "full": 62,
+    "metadata_only": 38
+   },
+   "unconfirmed": false
+  },
+  {
+   "tool_id": "ollama-client",
+   "process": "ollama-client",
+   "provider_id": "ollama",
+   "display_name": "Ollama client",
+   "category": "local_llm",
+   "sanctioned": true,
+   "confidence": "high",
+   "event_count": 0,
+   "bytes_out": null,
+   "first_seen": "2026-10-31T09:12:04",
+   "last_seen": "2026-10-31T09:41:12",
+   "risk": 9,
+   "risk_band": "low",
+   "finding_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+   },
+   "capabilities": {
+    "shell": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_read": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_write": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "network": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "mcp": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "sensitive_file": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    }
+   },
+   "visibility": {
+    "full": 62,
+    "metadata_only": 38
+   },
+   "unconfirmed": false
+  },
+  {
+   "tool_id": "featherless-app",
+   "process": "featherless-app",
+   "provider_id": "featherless",
+   "display_name": "Featherless app",
+   "category": "cloud_llm",
+   "sanctioned": false,
+   "confidence": "high",
+   "event_count": 0,
+   "bytes_out": null,
+   "first_seen": "2026-10-31T09:12:04",
+   "last_seen": "2026-10-31T09:41:12",
+   "risk": 22,
+   "risk_band": "low",
+   "finding_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+   },
+   "capabilities": {
+    "shell": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_read": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_write": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "network": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "mcp": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "sensitive_file": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    }
+   },
+   "visibility": {
+    "full": 62,
+    "metadata_only": 38
+   },
+   "unconfirmed": false
+  },
+  {
+   "tool_id": "copilot",
+   "process": "copilot",
+   "provider_id": "openai",
+   "display_name": "Copilot",
+   "category": "cloud_llm",
+   "sanctioned": true,
+   "confidence": "high",
+   "event_count": 0,
+   "bytes_out": null,
+   "first_seen": "2026-10-31T09:12:04",
+   "last_seen": "2026-10-31T09:41:12",
+   "risk": 33,
+   "risk_band": "moderate",
+   "finding_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+   },
+   "capabilities": {
+    "shell": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_read": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "fs_write": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "network": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "mcp": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    },
+    "sensitive_file": {
+     "granted": false,
+     "used": false,
+     "risky": false
+    }
+   },
+   "visibility": {
+    "full": 62,
+    "metadata_only": 38
+   },
+   "unconfirmed": false
+  }
+ ],
+ "total": 8
+}

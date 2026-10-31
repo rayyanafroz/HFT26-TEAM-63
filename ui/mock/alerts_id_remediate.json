@@ -1,0 +1,21 @@
+{
+ "id": "r2",
+ "alert_id": "x",
+ "summary": "Stop the agent session and review the command history. Remove shell access from this agent unless it is needed.",
+ "steps": [
+  "Stop the session.",
+  "Check what the command downloaded.",
+  "Remove the shell tool from the agent config."
+ ],
+ "sensitivity": "critical",
+ "verdict": "needs_review",
+ "data_classes": [
+  "command"
+ ],
+ "source": "template",
+ "model": null,
+ "latency_ms": null,
+ "redaction_check": "not_applicable",
+ "prompt_text": null,
+ "created_at": "2026-10-31T09:45:10"
+}

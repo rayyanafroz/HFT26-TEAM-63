@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShadowLens components</title>
+  <link rel="stylesheet" href="app.css">
+  <style>
+    /* Layout of this sheet only. Component styles live in app.css. */
+    .sheet { padding: 40px 48px 48px; }
+    .sheet h1 { margin-top: 6px; font-size: 32px; line-height: 38px; font-weight: 800; letter-spacing: -0.02em; }
+    .grid { display: grid; gap: 20px; margin-top: 28px; }
+    .row1 { grid-template-columns: 440px 440px 1fr; }
+    .row2 { grid-template-columns: repeat(5, 1fr); }
+    .row3 { grid-template-columns: 1fr 1fr 1fr 1.15fr; }
+    .stack { display: flex; flex-direction: column; gap: 14px; }
+    .inline { display: flex; align-items: center; gap: 19px; flex-wrap: wrap; }
+    .note { color: var(--slate); font-size: 13px; line-height: 20px; margin-top: 14px; }
+    .swatches { display: flex; gap: 14px; }
+    .swatch { width: 70px; height: 52px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 1px solid var(--card-border); background: var(--white); }
+    .swatch--tint { background: var(--teal-tint); border-color: #BCDAD5; }
+    .swatch--night { background: linear-gradient(180deg, #12232B, var(--night)); color: var(--paper); border-color: var(--night-line); }
+    .tight td { padding: 12px 14px; }
+    .toast-demo { box-shadow: var(--shadow-toast); }
+  </style>
+</head>
+<body>
+  <main class="sheet" id="sheet">
+    <div class="label">Reusable components</div>
+    <h1 class="h2">Components and control states</h1>
+  </main>
+
+  <script type="module">
+    import { el } from "./js/ui.js";
+    import { button, toggle, chip, searchInput, selectButton, sevMark, stateCell, coverageBand,
+             redaction, metricTile, card, banner, toast, errorBlock } from "./js/components/primitives.js";
+
+    const sheet = document.getElementById("sheet");
+    const label = (t) => el("div", { class: "label card__label" }, t);
+
+    /* Row 1: buttons, toggle, filter chips */
+    const buttons = el("section", { class: "card" }, label("Buttons"),
+      el("div", { class: "inline" },
+        button({ label: "Primary" }),
+        button({ label: "Secondary", variant: "secondary" }),
+        button({ label: "Disabled", disabled: true }),
+        button({ label: "Small", variant: "small" })),
+      el("p", { class: "note" }, "Radius 6. Hatch is never used on a control."));
+
+    const toggles = el("section", { class: "card" }, label("Toggle"),
+      el("div", { class: "inline" },
+        toggle({ checked: true, label: "On" }),
+        toggle({ checked: false, label: "Off" }),
+        toggle({ checked: false, disabled: true, label: "Disabled" })));
+
+    const chips = el("section", { class: "card" }, label("Filter chips"),
+      el("div", { class: "stack" },
+        el("div", { class: "inline", style: "gap:14px" },
+          chip({ label: "Critical", pressed: true }), chip({ label: "High", pressed: true }),
+          chip({ label: "Medium" }), chip({ label: "Low" })),
+        el("div", { class: "inline", style: "gap:14px" },
+          selectButton({ label: "Tool" }), searchInput({ placeholder: "Search" }))));
+
+    sheet.append(el("div", { class: "grid row1" }, buttons, toggles, chips));
+
+    /* Row 2: severity, state cell, coverage, card surfaces, redaction */
+    const severity = el("section", { class: "card" }, label("Severity, by bars and weight"),
+      el("div", { class: "stack", style: "gap:14px" },
+        sevMark("critical"), sevMark("high"), sevMark("medium"), sevMark("low")));
+
+    const cells = el("section", { class: "card" }, label("State cell"),
+      el("div", { class: "stack", style: "gap:14px" },
+        stateCell("absent"), stateCell("granted"), stateCell("used"), stateCell("unseen"),
+        stateCell("used", { label: "", risky: true })));
+
+    const coverage = el("section", { class: "card" }, label("Coverage band"),
+      coverageBand({ full: 62, metadataOnly: 38 }),
+      el("p", { class: "note" }, "Solid is seen. Hatch is not seen. Always with numbers."));
+
+    const surfaces = el("section", { class: "card" }, label("Card surfaces"),
+      el("div", { class: "swatches" },
+        el("div", { class: "swatch" }, "White"),
+        el("div", { class: "swatch swatch--tint" }, "Tint"),
+        el("div", { class: "swatch swatch--night" }, "Night")),
+      el("p", { class: "note" }, "White for data, tint for attention, night for score and status."));
+
+    const redact = el("section", { class: "card" }, label("Redaction"),
+      el("div", { class: "mono", style: "font-size:16px" }, "key=", redaction({ width: 140 })),
+      el("p", { class: "note" }, "Grey solid means seen, then hidden by us."));
+
+    sheet.append(el("div", { class: "grid row2" }, severity, cells, coverage, surfaces, redact));
+
+    /* Row 3: metric tile, selected row, banner and error, toast */
+    const metric = metricTile({ label: "Open alerts", value: "9", sub: "of 11 total" });
+
+    const rows = el("section", { class: "card" }, label("Table row, selected"),
+      el("table", { class: "table tight" },
+        el("tbody", {},
+          el("tr", { "aria-selected": "true" }, el("td", {}, sevMark("critical")), el("td", {}, "AWS secret key")),
+          el("tr", {}, el("td", {}, sevMark("high")), el("td", {}, "Customer list")))));
+
+    const states = el("section", { class: "card" }, label("Banner and error"),
+      el("div", { class: "stack", style: "gap:12px" },
+        banner("Live stream dropped. Polling every 3 s."),
+        el("div", { class: "error-box" }, "Could not load."),
+        button({ label: "Retry", block: true })));
+
+    const toasts = el("section", { class: "card" }, label("Toast"),
+      toast({ label: "High alert", title: "Secret typed in Claude Code (live)" }));
+
+    sheet.append(el("div", { class: "grid row3" }, metric, rows, states, toasts));
+  </script>
+</body>
+</html>

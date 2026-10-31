@@ -1,0 +1,83 @@
+{
+ "compliance_score": 48,
+ "org_risk": 52,
+ "band": "high",
+ "disclaimer": "This is an interpretation of risk, not an audit.",
+ "controls": [
+  {
+   "id": "LLM02",
+   "framework": "owasp_llm",
+   "title": "Sensitive information disclosure",
+   "status": "gap",
+   "finding_count": 5,
+   "finding_ids": [
+    "f1b2c3d4-0000-4000-8000-000000000001",
+    "f1b2c3d4-0000-4000-8000-000000000003",
+    "f1b2c3d4-0000-4000-8000-000000000006",
+    "f1b2c3d4-0000-4000-8000-000000000008",
+    "f1b2c3d4-0000-4000-8000-000000000009"
+   ]
+  },
+  {
+   "id": "LLM06",
+   "framework": "owasp_llm",
+   "title": "Excessive agency",
+   "status": "gap",
+   "finding_count": 3,
+   "finding_ids": [
+    "f1b2c3d4-0000-4000-8000-000000000002",
+    "f1b2c3d4-0000-4000-8000-000000000005"
+   ]
+  },
+  {
+   "id": "LLM05",
+   "framework": "owasp_llm",
+   "title": "Improper output handling",
+   "status": "ok",
+   "finding_count": 0,
+   "finding_ids": []
+  },
+  {
+   "id": "LLM07",
+   "framework": "owasp_llm",
+   "title": "System prompt leakage",
+   "status": "ok",
+   "finding_count": 0,
+   "finding_ids": []
+  },
+  {
+   "id": "POL-1",
+   "framework": "internal",
+   "title": "Only approved AI tools",
+   "status": "gap",
+   "finding_count": 4,
+   "finding_ids": [
+    "f1b2c3d4-0000-4000-8000-000000000004",
+    "f1b2c3d4-0000-4000-8000-000000000007"
+   ]
+  },
+  {
+   "id": "POL-2",
+   "framework": "internal",
+   "title": "No secrets in prompts",
+   "status": "gap",
+   "finding_count": 5,
+   "finding_ids": [
+    "f1b2c3d4-0000-4000-8000-000000000001",
+    "f1b2c3d4-0000-4000-8000-000000000008",
+    "f1b2c3d4-0000-4000-8000-000000000010"
+   ]
+  },
+  {
+   "id": "POL-3",
+   "framework": "internal",
+   "title": "Agents act within granted access",
+   "status": "gap",
+   "finding_count": 3,
+   "finding_ids": [
+    "f1b2c3d4-0000-4000-8000-000000000002",
+    "f1b2c3d4-0000-4000-8000-000000000005"
+   ]
+  }
+ ]
+}

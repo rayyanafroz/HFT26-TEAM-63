@@ -1,0 +1,36 @@
+{
+ "tool_id": "claude-code",
+ "S": 58.5,
+ "score": 52,
+ "items": [
+  {
+   "finding_id": "f1",
+   "rule_id": "SEC_AWS_SECRET_KEY",
+   "severity": "critical",
+   "w_sev": 60,
+   "confidence": 0.9,
+   "m_exposure": 1.0,
+   "m_sanction": 1.0,
+   "count_factor": 1.0,
+   "points": 54.0
+  },
+  {
+   "finding_id": "f2",
+   "rule_id": "POLICY_UNSANCTIONED_TOOL",
+   "severity": "low",
+   "w_sev": 5,
+   "confidence": 0.9,
+   "m_exposure": 1.0,
+   "m_sanction": 1.0,
+   "count_factor": 1.0,
+   "points": 4.5
+  }
+ ],
+ "org": {
+  "max_tool_score": 52,
+  "mean_top3": 52.0,
+  "org_risk": 52,
+  "compliance_score": 48,
+  "band": "high"
+ }
+}
