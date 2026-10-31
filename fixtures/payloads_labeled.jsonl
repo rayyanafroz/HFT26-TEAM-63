@@ -1,0 +1,88 @@
+{"id":"sec-openai-1","input":{"body":"My script keeps failing with this key: {{fake:openai_key#11}} what is wrong?"},"expect":["SEC_OPENAI_KEY"]}
+{"id":"sec-openai-2","input":{"body":{"model":"gpt-4o","messages":[{"role":"user","content":"client = OpenAI(\n  api_key=\"{{fake:openai_key#12}}\"\n)"}]}},"expect":["SEC_OPENAI_KEY"]}
+{"id":"sec-anthropic-1","input":{"body":"ANTHROPIC_API_KEY={{fake:anthropic_key#11}}"},"expect":["SEC_ANTHROPIC_KEY"]}
+{"id":"sec-anthropic-2","input":{"body":{"messages":[{"role":"user","content":"line one\n{{fake:anthropic_key#12}}\nline three"}]}},"expect":["SEC_ANTHROPIC_KEY"]}
+{"id":"sec-aws-access-1","input":{"body":"the key id is {{fake:aws_access_key#11}} in production"},"expect":["SEC_AWS_ACCESS_KEY"]}
+{"id":"sec-aws-access-2","input":{"body":{"messages":[{"role":"user","content":"aws_access_key_id={{fake:aws_access_key#12}}"}]}},"expect":["SEC_AWS_ACCESS_KEY"]}
+{"id":"sec-aws-secret-1","input":{"body":"aws_secret_access_key = {{fake:aws_secret_key#11}}"},"expect":["SEC_AWS_SECRET_KEY"]}
+{"id":"sec-aws-secret-2","input":{"body":{"messages":[{"role":"user","content":"secret_access_key: \"{{fake:aws_secret_key#12}}\""}]}},"expect":["SEC_AWS_SECRET_KEY"]}
+{"id":"sec-github-1","input":{"body":"git clone https://{{fake:github_token#11}}@github.com/acme/app.git"},"expect":["SEC_GITHUB_TOKEN"]}
+{"id":"sec-github-2","input":{"body":{"messages":[{"role":"user","content":"GITHUB_TOKEN={{fake:github_token#12}}"}]}},"expect":["SEC_GITHUB_TOKEN"]}
+{"id":"sec-slack-1","input":{"body":"post with token {{fake:slack_token#11}} to the channel"},"expect":["SEC_SLACK_TOKEN"]}
+{"id":"sec-slack-2","input":{"body":{"messages":[{"role":"user","content":"SLACK_BOT_TOKEN: {{fake:slack_token#12}}"}]}},"expect":["SEC_SLACK_TOKEN"]}
+{"id":"sec-google-1","input":{"body":"maps key {{fake:google_key#11}} stopped working"},"expect":["SEC_GOOGLE_API_KEY"]}
+{"id":"sec-google-2","input":{"query":"key={{fake:google_key#12}}","body":"hello"},"expect":["SEC_GOOGLE_API_KEY"]}
+{"id":"sec-hf-1","input":{"body":"huggingface-cli login --token {{fake:hf_token#11}}"},"expect":["SEC_HF_TOKEN"]}
+{"id":"sec-hf-2","input":{"body":{"messages":[{"role":"user","content":"use this:\n{{fake:hf_token#12}}"}]}},"expect":["SEC_HF_TOKEN"]}
+{"id":"sec-stripe-1","input":{"body":"charge failed with {{fake:stripe_key#11}}"},"expect":["SEC_STRIPE_KEY"]}
+{"id":"sec-stripe-2","input":{"body":{"messages":[{"role":"user","content":"stripe.api_key = \"{{fake:stripe_key#12}}\""}]}},"expect":["SEC_STRIPE_KEY"]}
+{"id":"sec-jwt-1","input":{"body":"decode this for me {{fake:jwt#11}}"},"expect":["SEC_JWT"]}
+{"id":"sec-jwt-2","input":{"body":{"model":"m","messages":[]},"headers":{"authorization":"Bearer {{fake:jwt#12}}"}},"expect":["SEC_JWT"]}
+{"id":"sec-private-key-1","input":{"body":"{{fake:private_key_header}}\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC"},"expect":["SEC_PRIVATE_KEY"]}
+{"id":"sec-private-key-2","input":{"body":{"messages":[{"role":"user","content":"why is ssh rejecting this?\n{{fake:private_key_header}}\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC"}]}},"expect":["SEC_PRIVATE_KEY"]}
+{"id":"sec-db-url-1","input":{"body":"DATABASE_URL={{fake:db_url#11}}"},"expect":["SEC_DB_URL"]}
+{"id":"sec-db-url-2","input":{"body":{"messages":[{"role":"user","content":"connect with \"{{fake:db_url#12}}\" fails"}]}},"expect":["SEC_DB_URL"]}
+{"id":"sec-generic-1","input":{"body":"password={{fake:password#11}}"},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"sec-generic-2","input":{"body":{"messages":[{"role":"user","content":"config = {\"client_secret\": \"{{fake:password#12}}\"}"}]}},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"sec-generic-3","input":{"body":{"client_secret":"{{fake:password#13}}","grant":"client"}},"expect":["SEC_GENERIC_ASSIGNMENT"]}
+{"id":"sec-entropy-1","input":{"body":"here is the blob {{fake:aws_secret_key#21}} from the vault"},"expect":["SEC_HIGH_ENTROPY"]}
+{"id":"sec-entropy-2","input":{"body":{"messages":[{"role":"user","content":"session value\n{{fake:aws_secret_key#22}}"}]}},"expect":["SEC_HIGH_ENTROPY"]}
+{"id":"pii-card-1","input":{"body":"customer card {{fake:card_visa#11}} was declined"},"expect":["PII_CREDIT_CARD"]}
+{"id":"pii-card-2","input":{"body":{"messages":[{"role":"user","content":"refund to {{fake:card_mc#11}} please"}]}},"expect":["PII_CREDIT_CARD"]}
+{"id":"pii-card-3","input":{"body":"amex on file: {{fake:card_amex#11}}"},"expect":["PII_CREDIT_CARD"]}
+{"id":"pii-aadhaar-1","input":{"body":"KYC Aadhaar is {{fake:aadhaar#11}}, please verify"},"expect":["PII_AADHAAR"]}
+{"id":"pii-aadhaar-2","input":{"body":{"messages":[{"role":"user","content":"Aadhaar: {{fake:aadhaar#12}}"}]}},"expect":["PII_AADHAAR"]}
+{"id":"pii-ssn-1","input":{"body":"SSN {{fake:ssn#11}} on the application"},"expect":["PII_SSN"]}
+{"id":"pii-ssn-2","input":{"body":{"messages":[{"role":"user","content":"tax id {{fake:ssn#12}}"}]}},"expect":["PII_SSN"]}
+{"id":"pii-pan-1","input":{"body":"PAN number {{fake:pan#11}} for the invoice"},"expect":["PII_PAN"]}
+{"id":"pii-pan-2","input":{"body":{"messages":[{"role":"user","content":"vendor PAN: {{fake:pan#12}}"}]}},"expect":["PII_PAN"]}
+{"id":"pii-email-1","input":{"body":"write back to {{fake:email#11}} today"},"expect":["PII_EMAIL"]}
+{"id":"pii-email-2","input":{"body":{"messages":[{"role":"user","content":"cc {{fake:email#12}} and {{fake:email#13}}"}]}},"expect":["PII_EMAIL"]}
+{"id":"pii-phone-1","input":{"body":"call the customer on {{fake:phone_in#11}}"},"expect":["PII_PHONE"]}
+{"id":"pii-phone-2","input":{"body":{"messages":[{"role":"user","content":"mobile: {{fake:phone_in#12}}"}]}},"expect":["PII_PHONE"]}
+{"id":"pii-host-1","input":{"body":"the job runs on {{fake:internal_host#11}} every night"},"expect":["PII_INTERNAL_HOST"]}
+{"id":"pii-host-2","input":{"body":"it cannot reach 10.20.30.40 or 192.168.1.15 from the VPN"},"expect":["PII_INTERNAL_HOST"]}
+{"id":"mix-1","input":{"body":"user {{fake:email#21}} paid with {{fake:card_visa#21}} using key {{fake:stripe_key#21}}"},"expect":["PII_EMAIL","PII_CREDIT_CARD","SEC_STRIPE_KEY"]}
+{"id":"mix-2","input":{"body":{"messages":[{"role":"user","content":"aws_access_key_id = {{fake:aws_access_key#21}}\naws_secret_access_key = {{fake:aws_secret_key#23}}"}]}},"expect":["SEC_AWS_ACCESS_KEY","SEC_AWS_SECRET_KEY"]}
+{"id":"mix-foreign-header","input":{"body":"hello there","headers":{"x-api-key":"{{fake:github_token#21}}"}},"expect":["SEC_GITHUB_TOKEN"]}
+{"id":"mix-path","input":{"body":"hello there","path":"/hooks/{{fake:slack_token#21}}"},"expect":["SEC_SLACK_TOKEN"]}
+{"id":"neg-native-header-openai","input":{"body":"hello there","headers":{"authorization":"Bearer {{fake:openai_key#31}}"},"native_key_rules":["SEC_OPENAI_KEY"]},"expect":[]}
+{"id":"neg-native-header-hf","input":{"body":"hello there","headers":{"authorization":"Bearer {{fake:hf_token#31}}"},"native_key_rules":["SEC_HF_TOKEN"]},"expect":[]}
+{"id":"neg-entropy-header","input":{"body":"hello there","headers":{"x-api-key":"{{fake:aws_secret_key#31}}"}},"expect":[]}
+{"id":"neg-plain","input":{"body":"Summarize this article about renewable energy in three bullet points."},"expect":[]}
+{"id":"neg-lorem","input":{"body":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore."},"expect":[]}
+{"id":"neg-uuid","input":{"body":"request id 3f2b8c1e-9d4a-4b7e-8a6f-1c2d3e4f5a6b failed"},"expect":[]}
+{"id":"neg-uuid-upper","input":{"body":"trace 3F2B8C1E-9D4A-4B7E-8A6F-1C2D3E4F5A6B"},"expect":[]}
+{"id":"neg-git-sha","input":{"body":"please revert commit 9fceb02d0ae598e95dc970b74767f19372d61af8"},"expect":[]}
+{"id":"neg-sha256","input":{"body":"the checksum is e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},"expect":[]}
+{"id":"neg-md5","input":{"body":"md5 of the file: d41d8cd98f00b204e9800998ecf8427e"},"expect":[]}
+{"id":"neg-docker-digest","input":{"body":"FROM python@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},"expect":[]}
+{"id":"neg-npm-integrity","input":{"body":"\"integrity\": \"sha512-WFN04w68JoTVCkrWZnpKVfUHOXbgfmXvKZFCVM2bT0kOqJpWyH8vbCLZQkPzKhXzJ4Xp2oT5nR8yQmL3vS6uTg==\""},"expect":[]}
+{"id":"neg-base64-image","input":{"body":"what is in this picture? data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk8M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="},"expect":[]}
+{"id":"neg-base64-json","input":{"body":"payload eyJ1c2VyIjoiYWxpY2UiLCJyb2xlIjoiYWRtaW4iLCJhY3RpdmUiOnRydWV9"},"expect":[]}
+{"id":"neg-code","input":{"body":"def add(a, b):\n    return a + b\n\nprint(add(1, 2))"},"expect":[]}
+{"id":"neg-sklearn","input":{"body":"we use sk-learn and scikit-learn for this model"},"expect":[]}
+{"id":"neg-example-email","input":{"body":"send it to someone@example.com or test@test.com or a@example.org"},"expect":[]}
+{"id":"neg-12-digits","input":{"body":"order number 123456789012 shipped"},"expect":[]}
+{"id":"neg-bad-card","input":{"body":"card 4111 1111 1111 1112 fails the check digit"},"expect":[]}
+{"id":"neg-16-digits","input":{"body":"tracking 1234567890123456 is delayed"},"expect":[]}
+{"id":"neg-bad-pan","input":{"body":"code ABCDE1234F is not a person"},"expect":[]}
+{"id":"neg-placeholder-key","input":{"body":"api_key=your_api_key_here"},"expect":[]}
+{"id":"neg-placeholder-env","input":{"body":"password=${DB_PASSWORD} and token: <YOUR_TOKEN>"},"expect":[]}
+{"id":"neg-placeholder-xxx","input":{"body":"secret: xxxxxxxxxxxxxxxx"},"expect":[]}
+{"id":"neg-placeholder-changeme","input":{"body":"password = changeme12345"},"expect":[]}
+{"id":"neg-low-entropy-password","input":{"body":"password=aaaaaaaaaaaaaaaa"},"expect":[]}
+{"id":"neg-word-token","input":{"body":"the token is expired, and my secret is that I like tea"},"expect":[]}
+{"id":"neg-db-no-password","input":{"body":"postgres://localhost:5432/app works, and so does mysql://db.invalid/app"},"expect":[]}
+{"id":"neg-public-ip","input":{"body":"the site resolves to 8.8.8.8 and 172.15.0.1 and 172.32.0.1"},"expect":[]}
+{"id":"neg-bad-ip","input":{"body":"version 10.999.1.1 of the tool"},"expect":[]}
+{"id":"neg-version","input":{"body":"upgrade from 1.2.3.4 to 2.0.0-beta.17"},"expect":[]}
+{"id":"neg-path","input":{"body":"open src/shadowlens/analysis/secrets/detectors/module/file.py and fix it"},"expect":[]}
+{"id":"neg-windows-path","input":{"body":"the file is C:\\Users\\dev\\Documents\\Projects\\Reports\\Quarterly2026\\summary.docx"},"expect":[]}
+{"id":"neg-long-identifier","input":{"body":"rename getUserAccountByEmailAddressAndStatus to something shorter"},"expect":[]}
+{"id":"neg-snake-identifier","input":{"body":"the constant MAX_RETRY_COUNT_FOR_PAYMENT_GATEWAY_V2 is too long"},"expect":[]}
+{"id":"neg-model-name","input":{"body":{"model":"meta-llama/Llama-3.1-70B-Instruct-v2-xyz7","messages":[{"role":"user","content":"hi"}]}},"expect":[]}
+{"id":"neg-url","input":{"body":"read https://docs.python.org/3/library/re.html#regular-expression-syntax for details"},"expect":[]}
+{"id":"neg-confidential-no-copyright","input":{"body":"this is confidential, please keep it between us"},"expect":[]}
+{"id":"neg-short-fence","input":{"body":"run this:\n```\nnpm test\n```"},"expect":[]}
+{"id":"neg-css-color","input":{"body":"use #1a2b3c for the border and 12345px is too wide"},"expect":[]}
