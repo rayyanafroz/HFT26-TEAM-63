@@ -1,0 +1,10 @@
+[package]
+name = "engine-adapter"
+description = "Conformance protocol adapter for the Shadow Lens engine (JSON lines on stdin and stdout)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json = "1.0.154"
+shadowlens-engine = { path = "../core" }

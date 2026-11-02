@@ -26,3 +26,6 @@ Thumbs.db
 
 # Generated conformance suite (built from fakes at run time, never committed)
 conformance/build/
+
+# Rust build output
+engine/target/

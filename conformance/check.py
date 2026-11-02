@@ -22,7 +22,7 @@ from conformance.build import OUT, build
 def load(out_dir: Path = OUT) -> list[dict]:
     if not (out_dir / "cases.jsonl").exists():
         build(out_dir)
-    return [json.loads(line) for line in (out_dir / "cases.jsonl").read_text(encoding="utf-8").splitlines()]
+    return [json.loads(line) for line in (out_dir / "cases.jsonl").read_text(encoding="utf-8").split("\n") if line.strip()]
 
 
 def run(command: list[str], rows: list[dict]) -> dict[str, dict]:
@@ -32,7 +32,7 @@ def run(command: list[str], rows: list[dict]) -> dict[str, dict]:
     if done.returncode != 0:
         raise RuntimeError(f"adapter exited {done.returncode}: {done.stderr.strip()[:500]}")
     answers = {}
-    for line in done.stdout.splitlines():
+    for line in done.stdout.split("\n"):  # not splitlines(): JSON keeps U+2028 and friends unescaped
         if line.strip():
             reply = json.loads(line)
             answers[reply.pop("id")] = reply
