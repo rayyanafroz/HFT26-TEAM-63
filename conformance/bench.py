@@ -39,7 +39,7 @@ def inputs() -> dict[str, str]:
         "2500 keys": " ".join(fake("openai_key", i) for i in range(2500)),
         "IBAN prefixes on keys": " ".join("GB82" + fake("openai_key", i)[3:] for i in range(1500)),
         "json 100KB": json.dumps({"messages": [{"role": "user", "content": f"hello {i}"} for i in range(2500)]}),
-        "zero-width 50KB": "​".join("abcdefgh" * 800),
+        "zero-width 50KB": "\u200B".join("abcdefgh" * 800),
         "password words 64KB": "password " * 7000,
         "uppercase run 64KB": "ABCDE" * 13000,
         "code 2000 lines": "\n".join(f"def f{i}(x):\n    return x + {i};" for i in range(1000)),

@@ -29,3 +29,9 @@ conformance/build/
 
 # Rust build output
 engine/target/
+
+# Extension build output and dependencies
+extension/node_modules/
+extension/dist/
+extension/dist-test/
+extension/src/engine/shadowlens_engine.wasm

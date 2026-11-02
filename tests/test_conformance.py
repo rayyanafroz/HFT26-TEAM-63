@@ -60,7 +60,7 @@ def test_an_implementation_that_reports_utf16_spans_is_caught_only_where_it_matt
 
 def test_an_implementation_that_misses_hidden_characters_is_caught(rows):
     def ignores_zero_width(text, out):
-        return {"findings": [], "redacted_text": text, "safe_to_send": True, "failed": []} if "​" in text else out
+        return {"findings": [], "redacted_text": text, "safe_to_send": True, "failed": []} if "\u200B" in text else out
 
     _, misses = compare(rows, answers_from(rows, ignores_zero_width))
     assert any("zero-width" in m["id"] for m in misses)

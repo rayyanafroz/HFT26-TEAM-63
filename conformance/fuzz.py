@@ -34,10 +34,10 @@ WORDS = ("the", "key", "token", "password", "pwd", "secret", "api_key", "login",
          "Copyright", "(c)", "proprietary", "def", "class", "import", "return", "const", "Bearer", "mysql -u root -p",
          "sshpass -p", "credentials: admin /", "https://", "postgres://", "base64,", "model", "example", "test",
          "your_key", "changeme", "settings.DB_PASSWORD", "${SECRET}", "id", "uuid", "sha256", "commit", "corp", "lan")
-UNICODE = ("​", "‌", "‍", "⁠", "﻿", "­", "́", "ा", "ः", " ", " ",
-           " ", "　", "ı", "İ", "Σ", "σ", "а", "е", "о", "ｓ", "ｋ",
-           "١٢٣", "०१", "²", "①", "K", "ſ", "ﬁ", "", "\U0001F600",
-           "日本", "אב", "‮", " ", "\x0b", "\x0c", "\x1c", "\x1f", "\x7f", "\x00", "\x85",
+UNICODE = ("\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF", "\u00AD", "\u0301", "ा", "ः", "\u2028", "\u2029",
+           "\u00A0", "\u3000", "ı", "İ", "Σ", "σ", "а", "е", "о", "ｓ", "ｋ",
+           "١٢٣", "०१", "²", "①", "K", "ſ", "ﬁ", "\uE000", "\U0001F600",
+           "日本", "אב", "\u202E", "\u1680", "\x0b", "\x0c", "\x1c", "\x1f", "\x7f", "\x00", "\x85",
            "‐", "−", "－", "ΙΚ")
 ESCAPES = ("\\u0073", "\\u006B", "\\uD83D", "%41", "%0A", "%7e", "&#115;", "&#x6B;", "&#X2D;", "&#١٠٠;",
            "&#99999999;", "&#xD800;", "\\u00", "%G1", "&#;")
@@ -151,6 +151,7 @@ def main() -> int:
     parser.add_argument("--n", type=int, default=5000)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--show", type=int, default=5)
+    parser.add_argument("--text-only", action="store_true", help="skip the base64 and fold checks (for builds without those ops)")
     args = parser.parse_args()
     command = shlex.split(args.cmd)
     rng = random.Random(args.seed)
@@ -168,6 +169,10 @@ def main() -> int:
             problems.append(f"text {i}: {text[:300]!r}\n  expected {json.dumps(expected, ensure_ascii=False)[:600]}\n"
                             f"  got      {json.dumps(reply, ensure_ascii=False)[:600]}")
     print(f"analyze: {args.n - len(problems)}/{args.n} identical")
+    if args.text_only:
+        for problem in problems[: args.show]:
+            print("\n" + problem)
+        return 0 if not problems else 1
 
     pieces = b64_cases(rng, 3000)
     requests = [{"id": i, "op": "b64", "data": s, "strict": i % 2 == 0} for i, s in enumerate(pieces)]

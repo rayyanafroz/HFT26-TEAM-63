@@ -35,7 +35,7 @@ OUT = Path(__file__).resolve().parent / "build"
 SALT = b"s" * 32                     # fixed so hash12 is reproducible; real installs use a random one
 FIXTURES = ROOT / "fixtures" / "payloads_labeled.jsonl"
 
-ZW = "​"
+ZW = "\u200B"
 FULLWIDTH = {i: i + 0xFEE0 for i in range(0x21, 0x7F)}
 SECRET_KINDS = {
     "openai_key": "SEC_OPENAI_KEY", "anthropic_key": "SEC_ANTHROPIC_KEY", "aws_access_key": "SEC_AWS_ACCESS_KEY",
@@ -59,8 +59,8 @@ def disguises(value: str) -> dict[str, str]:
     return {
         "plain": value,
         "zero-width inside": value[:mid] + ZW + value[mid:],
-        "soft hyphen": value[:mid] + "­" + value[mid:],
-        "word joiner and BOM": value[:mid] + "⁠﻿" + value[mid:],
+        "soft hyphen": value[:mid] + "\u00AD" + value[mid:],
+        "word joiner and BOM": value[:mid] + "\u2060\uFEFF" + value[mid:],
         "fullwidth": value.translate(FULLWIDTH),
         "look-alike letters": value.replace("a", "а").replace("e", "е").replace("o", "о"),
         "url-encoded": urllib.parse.quote(value, safe=""),
@@ -103,7 +103,7 @@ def cases() -> Iterator[dict[str, Any]]:
         "the admin password is {v} ok", "pwd: {v}", "pass={v}", "passwd {v}", "my api key: {v}", "apikey={v}",
         "export DB_PASS={v}", "password:\n  {v}", "PASSWORD={v}", "mysql -u root -p{v}", "tool --password {v}",
         "x-api-key: {v}", "client secret: {v}", "https://x.example/login?user=a&password={v}",
-        "https://deploy:{v}@git.corp/repo.git", "sshpass -p {v} ssh host", "password：{v}", "pass​word={v}",
+        "https://deploy:{v}@git.corp/repo.git", "sshpass -p {v} ssh host", "password：{v}", "pass\u200Bword={v}",
     ]:
         yield _case("assignment", template, template.replace("{v}", "Xk39aQ2zLm7pR"), min_findings=1, hides="Xk39aQ2zLm7pR")
 
@@ -115,7 +115,7 @@ def cases() -> Iterator[dict[str, Any]]:
         wrong = value[:-1] + str((int(value[-1]) + 1) % 10)
         yield _case("pii-bad-checksum", kind, f"Reference number {wrong} was typed", must_not_find=[PII_KINDS[kind]])
 
-    prefix = ["", "\U0001F600 ", "\U0001F600\U0001F680 ", "café ", "é ", "日本語 ", "a‍b "]
+    prefix = ["", "\U0001F600 ", "\U0001F600\U0001F680 ", "café ", "e\u0301 ", "日本語 ", "a\u200Db "]
     for lead in prefix:
         yield _case("span-units", f"after {lead!r}", f"{lead}{key} end", must_find=["SEC_OPENAI_KEY"], hides=key)
 
