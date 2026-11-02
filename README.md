@@ -195,6 +195,7 @@ src/shadowlens/
   api/         app, routes_*, sse, local_only
   eval/        run (writes data/evidence.json)
 config/        providers, agent_rules, rules, sources, compliance
+conformance/   the detection engine's cross-language test suite (build, adapter, check)
 scenarios/     templates/*.jsonl, demo, mock_ollama, agent_sim, transcript_sim
 fixtures/      labeled test data and samples
 ui/            the dashboard (plain HTML, CSS, JavaScript)

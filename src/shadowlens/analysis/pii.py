@@ -25,6 +25,8 @@ _CARD_MAX_GROUPS, _CARD_MIN_GROUP_DIGITS = 5, 3
 # The lookahead tries every start. A plain match on "2345 2726 6483 2751" takes the first 12 digits,
 # fails the checksum and moves past the real number. The same applies to "LL64 " before an IBAN.
 _AADHAAR_RE = re.compile(r"(?<!\d)(?=([2-9]\d{3}[\s\-.]?\d{4}[\s\-.]?\d{4})(?!\d))")
+# The last group of a UUID is 12 hex characters. When they are all digits, one in ten passes the Aadhaar checksum.
+_UUID_PREFIX_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-")
 _IBAN_START_RE = re.compile(r"(?i)\b(?=[A-Z]{2}\d{2})")
 _IBAN_RUN_RE = re.compile(r"(?i)[A-Z]{2}\d{2}(?: ?[A-Z0-9]{1,4}){3,9}\b")
 _IBAN_GROUP_RE = re.compile(r"[A-Za-z0-9]+")
@@ -137,6 +139,11 @@ def _valid_octets(value: str) -> bool:
     return all(int(part) <= 255 for part in value.split("."))
 
 
+def _ends_a_uuid(text: str, start: int) -> bool:
+    """True when the 12 characters at ``start`` are the last group of a UUID."""
+    return start >= 24 and _UUID_PREFIX_RE.fullmatch(text, start - 24, start) is not None
+
+
 def find_pii(text: str, settings: AnalysisSettings) -> list[Candidate]:
     found: list[Candidate] = list(_cards(text)) + list(_single_digit_cards(text))
     skip_domains = {domain.lower() for domain in settings.email_skip_domains}
@@ -147,6 +154,8 @@ def find_pii(text: str, settings: AnalysisSettings) -> list[Candidate]:
                 found.append(Candidate(rule_id, match.start(), match.end(), match.group(0)))
 
     for match in _AADHAAR_RE.finditer(text):
+        if _ends_a_uuid(text, match.start(1)):
+            continue
         if verhoeff_valid(_digits_only(match.group(1))):
             found.append(Candidate("PII_AADHAAR", match.start(1), match.end(1), match.group(1)))
     found.extend(_ibans(text))

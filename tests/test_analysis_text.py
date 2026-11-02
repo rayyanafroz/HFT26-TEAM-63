@@ -82,6 +82,18 @@ def test_entropy_cap_keeps_three_and_marks_truncation():
 
 # ---- labeled negatives ---------------------------------------------------
 
+def test_the_last_group_of_a_uuid_is_not_an_aadhaar_number():
+    # 426614174000 is all digits and passes the checksum, so it used to be reported.
+    text = "request id 123e4567-e89b-12d3-a456-426614174000 failed"
+    assert [f.rule_id for f in analyze_text(text, SETTINGS).findings] == []
+
+
+def test_a_real_aadhaar_next_to_a_dash_is_still_found():
+    number = fake("aadhaar", 2).replace(" ", "")
+    for text in (f"ref-{number}", f"id 123e4567-e89b-12d3-{number}", f"{number[:8]}-{number}"):
+        assert "PII_AADHAAR" in {f.rule_id for f in analyze_text(text, SETTINGS).findings}, text
+
+
 @pytest.mark.parametrize("text", [
     "a plain sentence about nothing in particular",
     str(uuid.UUID(int=123456789)),
