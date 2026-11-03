@@ -173,7 +173,8 @@ def test_the_launcher_starts_a_working_host_the_way_chrome_does(tmp_path):
     root.mkdir()
     (root / "src").symlink_to(native_host.ROOT / "src")
     native_host.install(tmp_path / "home", platform="linux", ext_id="b" * 32, python=sys.executable, root=root, all_browsers=True)
-    env = {**os.environ, "PYTHONPATH": str(native_host.ROOT / "src"), "SHADOWLENS_RESOLVE": "false"}
+    inherited = {k: v for k, v in os.environ.items() if not k.startswith("SHADOWLENS_")}   # the caller's settings are not the test's
+    env = {**inherited, "PYTHONPATH": str(native_host.ROOT / "src"), "SHADOWLENS_RESOLVE": "false"}
     done = subprocess.run([str(root / "data" / "shadowlens-host"), f"chrome-extension://{'b' * 32}/"],
                           input=frame({"type": "hello"}) + frame({"type": "guard_event", "event": browser_event(id="viahost")}),
                           capture_output=True, env=env, timeout=60)
