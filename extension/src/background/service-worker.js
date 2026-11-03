@@ -14,6 +14,9 @@ import * as companion from "./companion.js";
 import * as store from "./store.js";
 
 const MAX_TEXT = 5 * 1024 * 1024; // characters; bigger text is not checked (and the person is told)
+const MAX_DOCUMENT_BASE64 = 30 * 1024 * 1024; // a 20 MB screenshot is about 27 MB of base64
+
+const hostOf = (sender) => new URL(sender.url ?? sender.tab?.url ?? "about:blank").host;
 
 let engine = null; // { key, promise }
 
@@ -129,7 +132,7 @@ const handlers = {
   async redact({ text, kind, site, cleanHidden }, sender) {
     text = String(text ?? "");
     const result = await scan(text, kind, site);
-    return store.withVault(sender.tab.id, (vault) => {
+    return store.withVault(sender.tab.id, hostOf(sender), (vault) => {
       const out = redact(text, result.findings, vault);
       return {
         text: cleanHidden ? clean(out.text) : out.text,
@@ -139,15 +142,17 @@ const handlers = {
     });
   },
   async restore({ text }, sender) {
-    const vault = await store.getVault(sender.tab.id);
+    if (String(text ?? "").length > MAX_TEXT) throw new Error("too much text to restore");
+    const vault = await store.getVault(sender.tab.id, hostOf(sender));
     return { text: restore(String(text ?? ""), vault), placeholders: knownPlaceholders(String(text ?? ""), vault) };
   },
   async vaultNames(_, sender) {
-    const vault = await store.getVault(sender.tab.id);
+    const vault = await store.getVault(sender.tab.id, hostOf(sender));
     return { names: Object.keys(vault.values) };
   },
   async extract({ name, base64 }) {
-    return { text: await extractDocument(String(name), String(base64)) };
+    if (String(base64 ?? "").length > MAX_DOCUMENT_BASE64) throw new Error("the file is too large to read");
+    return { text: await extractDocument(String(name).slice(0, 255), String(base64)) };
   },
   async record({ event }, sender) {
     return record(event, sender);
@@ -216,7 +221,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  store.dropVault(tabId);
+  store.dropVaults(tabId);
 });
 
 // Tabs that were open before an install or update have no content script; put one in.

@@ -89,6 +89,9 @@ test("hidden text: tag characters, direction overrides and zero-width runs are f
   assert.equal(clean(smuggled), "Summarise this.");
   assert.equal(inspect("abc\u202Edef")[0].rule_id, "HIDDEN_TEXT");
   assert.equal(inspect("a\u200B\u200B\u200Bb")[0].rule_id, "HIDDEN_TEXT");
+  assert.equal(inspect("a\u200B\u200B\u200Bb")[0].severity, "medium", "zero-width characters alone only warn");
+  assert.equal(inspect("abc\u202Edef")[0].severity, "high", "a direction override blocks");
+  assert.equal(found[0].severity, "high", "a hidden message blocks");
   assert.deepEqual(inspect("family \u{1F468}\u200D\u{1F469}\u200D\u{1F467} and one\u200Bspace"), []);
   assert.equal(clean("\u{1F468}\u200D\u{1F469}"), "\u{1F468}\u200D\u{1F469}");
   assert.equal(decodeTags(String.fromCodePoint(0xe0041, 0xe0042)), "AB");

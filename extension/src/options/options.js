@@ -134,4 +134,5 @@ async function main() {
   });
 }
 
+document.getElementById("build").textContent = `Version ${chrome.runtime.getManifest().version_name ?? chrome.runtime.getManifest().version}. After rebuilding, reload the extension on the extensions page.`;
 main();

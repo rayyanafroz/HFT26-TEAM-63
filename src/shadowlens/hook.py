@@ -24,8 +24,11 @@ way) or ``closed``. Every decision is recorded for the dashboard's Guard screen 
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
+import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +51,24 @@ FILE_TOOLS = {"Read": ("file_path",), "Edit": ("file_path",), "Write": ("file_pa
               "NotebookEdit": ("notebook_path",), "NotebookRead": ("notebook_path",), "Glob": ("path", "pattern"),
               "Grep": ("path", "glob")}
 MATCHER = "Bash|Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|WebFetch|WebSearch|mcp__.*"
+MAX_PEEK_BYTES = 2_000_000                 # files larger than this are not opened before a Read
+
+# The same placeholder names as the browser extension (extension/src/shared/rules.js).
+PLACEHOLDERS = {
+    "SEC_PRIVATE_KEY": "PRIVATE_KEY", "SEC_AWS_SECRET_KEY": "AWS_SECRET_ACCESS_KEY", "SEC_GITHUB_TOKEN": "GITHUB_TOKEN",
+    "SEC_STRIPE_KEY": "STRIPE_KEY", "SEC_DB_URL": "DATABASE_URL", "SEC_AWS_ACCESS_KEY": "AWS_ACCESS_KEY_ID",
+    "SEC_OPENAI_KEY": "OPENAI_API_KEY", "SEC_ANTHROPIC_KEY": "ANTHROPIC_API_KEY", "SEC_SLACK_TOKEN": "SLACK_TOKEN",
+    "SEC_GOOGLE_API_KEY": "GOOGLE_API_KEY", "SEC_HF_TOKEN": "HF_TOKEN", "SEC_JWT": "JWT", "SEC_GENERIC_ASSIGNMENT": "SECRET",
+    "SEC_HIGH_ENTROPY": "TOKEN", "PII_CREDIT_CARD": "CARD_NUMBER", "PII_AADHAAR": "AADHAAR", "PII_IBAN": "IBAN", "PII_SSN": "SSN",
+    "PII_BULK": "PERSONAL_DATA", "PII_PAN": "PAN", "PII_EMAIL": "EMAIL", "PII_PHONE": "PHONE", "PII_INTERNAL_HOST": "INTERNAL_HOST",
+}
+
+# Commands that only read and print. Their output can be put through the redactor without changing what
+# they do. "find" is read-only unless it executes or deletes; git only for the subcommands listed.
+READ_ONLY = {"cat", "grep", "egrep", "fgrep", "rg", "head", "tail", "ls", "echo", "wc", "env", "printenv", "jq", "sort", "uniq",
+             "cut", "tr", "nl", "column", "less", "more", "file", "stat", "du", "df", "tree", "find", "git", "printf", "strings", "od", "xxd"}
+READ_ONLY_GIT = {"diff", "show", "log", "status", "grep", "blame", "cat-file"}
+_NOT_SIMPLE = re.compile(r"[<>`]|\$\(|&(?!&)|\n|<<")
 
 
 # ---- settings ---------------------------------------------------------------------------------------
@@ -90,8 +111,78 @@ def describe(findings: list[Any]) -> list[str]:
 
 
 def analyze(text: str, settings: AnalysisSettings):
-    result = analyze_text(text[:MAX_TEXT], settings)
-    return result
+    # No cap on entropy findings: every one is listed, so every one can be replaced.
+    settings = dataclasses.replace(settings, max_entropy_findings_per_event=100_000)
+    return analyze_text(text[:MAX_TEXT], settings)
+
+
+def friendly_redact(text: str, findings: list[Any]) -> str:
+    """The text with each value replaced by a numbered placeholder such as [OPENAI_API_KEY_1], as in the browser."""
+    names: dict[tuple[str, str], str] = {}
+    counters: dict[str, int] = {}
+    edits = []
+    for f in findings:
+        name = PLACEHOLDERS.get(f.rule_id)
+        if not name:
+            continue                                          # code findings and the like are not values
+        key = (f.rule_id, f.hash12)
+        if key not in names:
+            counters[name] = counters.get(name, 0) + 1
+            names[key] = f"[{name}_{counters[name]}]"
+        edits.extend((a, b, names[key]) for a, b in f.spans)
+    out, cursor = [], 0
+    for a, b, placeholder in sorted(edits, key=lambda e: (e[0], -e[1])):
+        if a < cursor:
+            continue
+        out.append(text[cursor:a])
+        out.append(placeholder)
+        cursor = b
+    out.append(text[cursor:])
+    return "".join(out)
+
+
+def is_read_only(command: str) -> bool:
+    """A command whose every step only reads and prints, with no redirection or substitution."""
+    if not command.strip() or _NOT_SIMPLE.search(command):
+        return False
+    for part in re.split(r"\|\||&&|;|\|", command):
+        try:
+            words = shlex.split(part)
+        except ValueError:
+            return False
+        if not words:
+            continue
+        while words and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[0]):
+            words = words[1:]                                 # FOO=bar cat x
+        if not words or os.path.basename(words[0]) not in READ_ONLY:
+            return False
+        name = os.path.basename(words[0])
+        if name == "find" and any(w in {"-exec", "-execdir", "-delete", "-ok", "-fprint"} for w in words):
+            return False
+        if name == "git" and not (len(words) > 1 and words[1] in READ_ONLY_GIT):
+            return False
+    return True
+
+
+def redacting(command: str) -> str:
+    """The command with its output (stdout and stderr) put through the redactor; its exit status is kept."""
+    return f'set -o pipefail; {{ {command} ; }} 2>&1 | "{launcher_path()}" redact-stream'
+
+
+def peek(path: str, cwd: str | None) -> str | None:
+    """A small text file's content, read before the agent reads it; None if it cannot be read as text."""
+    try:
+        p = Path(path).expanduser()
+        if not p.is_absolute() and cwd:
+            p = Path(cwd) / p
+        if not p.is_file() or p.stat().st_size > MAX_PEEK_BYTES:
+            return None
+        data = p.read_bytes()
+        if b"\0" in data[:8192]:
+            return None
+        return data.decode("utf-8", errors="replace")
+    except OSError:
+        return None
 
 
 def tool_text(tool: str, tool_input: Any) -> str:
@@ -145,14 +236,14 @@ def decide_prompt(prompt: str, settings: AnalysisSettings, options: Options) -> 
         lines = describe(result.findings)
         if action == "block":
             message = ("Shadow Lens stopped this prompt. It contains:\n" + "\n".join(lines)
-                       + "\n\nNothing was sent to the model. A safe version you can send instead:\n\n" + result.redacted_text)
+                       + "\n\nNothing was sent to the model. A safe version you can send instead:\n\n" + friendly_redact(prompt, result.findings))
         else:
             message = "Shadow Lens noticed:\n" + "\n".join(lines) + "\nThe prompt was sent."
-    return {"action": action, "findings": result.findings, "message": message, "redacted": result.redacted_text, "failed": result.failed}
+    return {"action": action, "findings": result.findings, "message": message, "redacted": friendly_redact(prompt, result.findings), "failed": result.failed}
 
 
-def decide_tool(tool: str, tool_input: Any, settings: AnalysisSettings, options: Options) -> dict[str, Any]:
-    """``{"action": allow|ask|deny, "reason", "findings"}`` for one tool call."""
+def decide_tool(tool: str, tool_input: Any, settings: AnalysisSettings, options: Options, cwd: str | None = None) -> dict[str, Any]:
+    """``{"action": allow|ask|deny, "reason", "findings", "updated_input"}`` for one tool call."""
     rules = settings.agent_rules
     text = tool_text(tool, tool_input)
     result = analyze(text, settings) if text else None
@@ -189,11 +280,26 @@ def decide_tool(tool: str, tool_input: Any, settings: AnalysisSettings, options:
         elif matches_any_view(rules.egress_commands, command):
             raise_to("ask")
             reasons.append("It sends local data to another machine.")
+
+    # Reading an ordinary file that holds a secret sends the secret to the model: look first.
+    if tool in {"Read", "NotebookRead"} and not sensitive and options.files != "allow" and isinstance(tool_input, dict):
+        content = peek(str(tool_input.get("file_path") or tool_input.get("notebook_path") or ""), cwd)
+        if content:
+            inside = [f for f in analyze(content, settings).findings if SEVERITY_ORDER[f.severity] >= SEVERITY_ORDER[BLOCK_AT]]
+            if inside:
+                raise_to("deny" if options.files == "deny" else "ask")
+                findings = findings + inside
+                reasons.append("The file holds a secret, and reading it sends the secret to the model:\n" + "\n".join(describe(inside)))
+
+    # A read-only command's output reaches the model as it is: put it through the redactor.
+    updated = None
+    if isinstance(command, str) and action == "allow" and options.mode == "block" and is_read_only(command):
+        updated = {**tool_input, "command": redacting(command)}
     if options.mode == "off":
-        action, reasons = "allow", []
+        action, reasons, updated = "allow", [], None
     elif options.mode == "warn" and action == "deny":
         action = "ask"
-    return {"action": action, "reason": "Shadow Lens: " + " ".join(reasons) if reasons else "", "findings": findings}
+    return {"action": action, "reason": "Shadow Lens: " + " ".join(reasons) if reasons else "", "findings": findings, "updated_input": updated}
 
 
 def decide_output(output: str, settings: AnalysisSettings, options: Options) -> dict[str, Any]:
@@ -267,8 +373,12 @@ def handle(payload: dict[str, Any], config: Config, options: Options, record: bo
         return None, None
     if event == "PreToolUse":
         tool = str(payload.get("tool_name") or "")
-        d = decide_tool(tool, payload.get("tool_input"), settings, options)
+        d = decide_tool(tool, payload.get("tool_input"), settings, options, cwd=payload.get("cwd"))
         if d["action"] == "allow":
+            if d["updated_input"]:
+                return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
+                                               "permissionDecisionReason": "Shadow Lens: output redacted",
+                                               "updatedInput": d["updated_input"]}}, None
             return None, None
         if record:
             remember(config, event_for(project, "tool", "blocked" if d["action"] == "deny" else "warned", d["findings"], reason=tool))
@@ -425,6 +535,7 @@ def cli(argv: list[str]) -> int:
     scan.add_argument("files", nargs="*")
     scan.add_argument("--redact", action="store_true", help="print the text with values replaced by placeholders")
     sub.add_parser("precommit", help="check what is staged in git")
+    sub.add_parser("redact-stream", help="copy standard input to standard output with values replaced (used by the hooks)")
     sub.add_parser("version")
     args = parser.parse_args(argv)
     home, project = Path.home(), Path.cwd()
@@ -443,6 +554,15 @@ def cli(argv: list[str]) -> int:
         print(__version__)
         return 0
     settings = settings_for(load_config())
+    if args.command == "redact-stream":
+        text = sys.stdin.buffer.read().decode("utf-8", errors="replace")
+        try:
+            out = friendly_redact(text, analyze(text, settings).findings)
+        except Exception:  # noqa: BLE001 - never pass unchecked output through as if it were checked
+            out = "[Shadow Lens could not check this output, so it was withheld.]\n"
+        sys.stdout.write(out)
+        sys.stdout.flush()
+        return 0
     if args.command == "precommit":
         found = 0
         for name, text in staged_additions():

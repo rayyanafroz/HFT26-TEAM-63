@@ -101,24 +101,28 @@ export function clearHistory() {
   return serialized("history", () => local.set({ history: [], stats: { total: {}, days: {} } }));
 }
 
-const vaultKey = (tabId) => `vault:${tabId}`;
+// One vault per tab and site: a value redacted on chatgpt.com is never restored on another site, even
+// when the person goes there in the same tab.
+const vaultKey = (tabId, host) => `vault:${tabId}:${host}`;
 
-export async function getVault(tabId) {
-  const key = vaultKey(tabId);
+export async function getVault(tabId, host) {
+  const key = vaultKey(tabId, host);
   const { [key]: vault } = await session.get(key);
   return vault ?? emptyVault();
 }
 
 /** Change a tab's vault under the queue, so two redactions in one tab never lose a placeholder. */
-export function withVault(tabId, work) {
-  return serialized(vaultKey(tabId), async () => {
-    const vault = await getVault(tabId);
+export function withVault(tabId, host, work) {
+  return serialized(vaultKey(tabId, host), async () => {
+    const vault = await getVault(tabId, host);
     const result = await work(vault);
-    await session.set({ [vaultKey(tabId)]: vault });
+    await session.set({ [vaultKey(tabId, host)]: vault });
     return result;
   });
 }
 
-export function dropVault(tabId) {
-  return serialized(vaultKey(tabId), () => session.remove(vaultKey(tabId)));
+/** Forget every vault of a tab (it was closed). */
+export async function dropVaults(tabId) {
+  const all = await session.get(null);
+  await session.remove(Object.keys(all).filter((k) => k.startsWith(`vault:${tabId}:`)));
 }

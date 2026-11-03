@@ -102,13 +102,21 @@ function headline(mode, decision, findings) {
 
 export function createUI() {
   const host = document.createElement("shadow-lens");
-  host.style.cssText = "all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646;";
+  // Inline !important beats any page stylesheet, so the site cannot hide the panel and leave a message held.
+  for (const [name, value] of Object.entries({ all: "initial", position: "fixed", inset: "0", "pointer-events": "none", "z-index": "2147483646", display: "block", visibility: "visible", opacity: "1" })) {
+    host.style.setProperty(name, value, "important");
+  }
   // Closed: the site's scripts cannot reach in. (The end-to-end test build opens it for the test driver.)
   const root = host.attachShadow({ mode: typeof __SHADOWLENS_TEST__ !== "undefined" && __SHADOWLENS_TEST__ ? "open" : "closed" });
   root.append(h("style", {}, CSS));
   const layer = h("div", { class: "layer" });
   root.append(layer);
   document.documentElement.append(host);
+  // ...and if the page removes it, it goes back.
+  const keeper = new MutationObserver(() => {
+    if (!host.isConnected) document.documentElement.append(host);
+  });
+  keeper.observe(document.documentElement, { childList: true });
 
   let open = null; // { panel, finish }
 
@@ -259,11 +267,17 @@ export function createUI() {
   }
   addEventListener("scroll", placeBadge, { passive: true, capture: true });
   addEventListener("resize", placeBadge, { passive: true });
+  // Composers grow and move as the conversation does; follow them while the badge shows.
+  const follow = setInterval(placeBadge, 400);
 
   /** state: { anchor, findings, action } or null to hide. */
   function setBadge(state, onClick) {
     badgeClick = onClick;
     if (!state || !state.anchor) {
+      badge.classList.remove("show");
+      return;
+    }
+    if (!state.anchor.isConnected) {
       badge.classList.remove("show");
       return;
     }
@@ -285,6 +299,8 @@ export function createUI() {
 
   function destroy() {
     close();
+    clearInterval(follow);
+    keeper.disconnect();
     host.remove();
     removeEventListener("scroll", placeBadge, { capture: true });
     removeEventListener("resize", placeBadge);

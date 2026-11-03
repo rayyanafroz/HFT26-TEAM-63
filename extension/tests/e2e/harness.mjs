@@ -36,7 +36,8 @@ export async function launch() {
   const profile = mkdtempSync(join(tmpdir(), "shadowlens-e2e-"));
   const context = await chromium.launchPersistentContext(profile, {
     headless: true,
-    channel: "chromium",
+    // BROWSER=/usr/bin/brave (or any Chromium-based browser) runs the suite in that browser instead.
+    ...(process.env.BROWSER ? { executablePath: process.env.BROWSER } : { channel: "chromium" }),
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
     permissions: ["clipboard-read", "clipboard-write"],
     viewport: { width: 1100, height: 900 },

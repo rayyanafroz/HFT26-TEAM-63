@@ -91,7 +91,8 @@ test("typing is checked live, and the restore switch swaps placeholders for the 
   await page.fill("#input", `use ${key} now`);
   await page.waitForFunction(() => /stopped/i.test(document.getElementById("verdict").textContent));
   assert.match(await page.locator("#reply-text").innerText(), /\[OPENAI_API_KEY_1\]/);
-  await page.check("#restore", { force: true });
+  await page.locator("label.switch").click(); // the visible switch, as a person clicks it
+  await page.waitForFunction(() => document.getElementById("restore").checked);
   assert.ok((await page.locator("#reply-text").innerText()).includes(key));
   assert.equal(await page.locator(".editor__marks mark").count(), 1);
   await page.close();

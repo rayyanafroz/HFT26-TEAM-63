@@ -35,8 +35,8 @@ function near(el, editor) {
 
 export const ADAPTERS = {
   chatgpt: {
-    composer: ["#prompt-textarea", 'div.ProseMirror[contenteditable="true"]', 'textarea[name="prompt-textarea"]'],
-    send: ['button[data-testid="send-button"]', "#composer-submit-button", 'button[aria-label="Send prompt"]', 'button[aria-label="Send message"]'],
+    composer: ["#prompt-textarea", 'div.ProseMirror[contenteditable="true"]', 'textarea[name="prompt-textarea"]', "textarea#mobile-composer-prompt", 'form textarea[placeholder*="ChatGPT" i]'],
+    send: ['button[data-testid="send-button"]', "#composer-submit-button", 'button[aria-label="Send prompt"]', 'button[aria-label="Send message"]', 'button[aria-label*="Send" i]'],
     messages: ["[data-message-author-role]"],
   },
   claude: {
@@ -73,23 +73,70 @@ export function createAdapter(id) {
     return root;
   }
 
-  function isComposer(el) {
-    return !!el && spec.composer.some((s) => el.matches(s));
+  function isVisible(el) {
+    return el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
   }
 
-  /** The main composer on the page: the first visible match of the site's selectors. */
-  function composer() {
-    for (const s of spec.composer) {
-      for (const el of document.querySelectorAll(s)) {
-        const root = editableRoot(el);
-        if (root && root.getClientRects().length) return root;
+  /** A send control in the composer's own area (its form, or a few levels around it). */
+  function sendNear(editor) {
+    let scope = editor.closest("form") ?? editor;
+    for (let i = 0; i < 5; i++) {
+      for (const button of scope.querySelectorAll('button, [role="button"], input[type="submit"]')) {
+        if (button !== editor && isVisible(button) && (sendSelectors.some((s) => button.matches(s)) || SEND_LABEL.test(label(button)))) return button;
       }
+      const up = scope.parentElement;
+      if (!up || PAGE_LEVEL.has(up.nodeName)) break;
+      scope = up;
     }
     return null;
   }
 
-  function isVisible(el) {
-    return el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+  const CHAT_PLACEHOLDER = /ask|message|prompt|chat|type|anything|question|reply|search|write|talk/i;
+
+  /**
+   * Sites change their markup often (logged-out ChatGPT uses a plain <textarea>, for one), so besides
+   * the site's own selectors, a visible multi-line editor counts as the composer when a send control is
+   * near it or it is labelled like one ("Ask anything", "Message ChatGPT").
+   */
+  function looksLikeComposer(el) {
+    if (!el || el instanceof HTMLInputElement || !(el instanceof HTMLTextAreaElement || el.isContentEditable)) return false;
+    if (!isVisible(el)) return false;
+    const hint = [el.getAttribute("placeholder"), el.getAttribute("aria-label"), el.getAttribute("data-placeholder"), el.closest("[aria-label]")?.getAttribute("aria-label")].filter(Boolean).join(" ");
+    return !!sendNear(el) || CHAT_PLACEHOLDER.test(hint) || el.getBoundingClientRect().width >= 280;
+  }
+
+  let lastComposer = null;
+
+  function isComposer(el) {
+    if (!el) return false;
+    const yes = spec.composer.some((s) => el.matches(s)) || looksLikeComposer(el);
+    if (yes) lastComposer = el;
+    return yes;
+  }
+
+  /** The main composer on the page: the site's own selectors, else the focused or last-used one, else the largest likely one. */
+  function composer() {
+    for (const s of spec.composer) {
+      for (const el of document.querySelectorAll(s)) {
+        const root = editableRoot(el);
+        if (root && isVisible(root)) return root;
+      }
+    }
+    const focused = editableRoot(document.activeElement);
+    if (focused && looksLikeComposer(focused)) return focused;
+    if (lastComposer?.isConnected && isVisible(lastComposer)) return lastComposer;
+    let best = null;
+    let bestArea = 0;
+    for (const el of document.querySelectorAll('textarea, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]')) {
+      const root = editableRoot(el);
+      if (!root || !looksLikeComposer(root)) continue;
+      const r = root.getBoundingClientRect();
+      if (r.width * Math.max(r.height, 20) > bestArea) {
+        best = root;
+        bestArea = r.width * Math.max(r.height, 20);
+      }
+    }
+    return best;
   }
 
   /** Is `node` (or an ancestor) the control that sends what is in `editor`? */
@@ -98,6 +145,7 @@ export function createAdapter(id) {
     const button = el?.closest?.('button, [role="button"], input[type="submit"]');
     if (!button) return null;
     if (spec.send.some((s) => button.matches(s))) return button;
+    if (editor && sendNear(editor) === button) return button;
     // Otherwise only a control near the composer counts, so "Send feedback" elsewhere is left alone.
     if (!near(button, editor)) return null;
     if (GENERIC_SEND.some((s) => button.matches(s)) || SEND_LABEL.test(label(button))) return button;
@@ -106,6 +154,8 @@ export function createAdapter(id) {
 
   /** The send control for `editor`: inside its form first, then anywhere on the page. */
   function findSend(editor) {
+    const near = editor && sendNear(editor);
+    if (near) return near;
     const scopes = [editor?.closest("form"), editor?.parentElement?.parentElement?.parentElement, document].filter(Boolean);
     for (const scope of scopes) {
       for (const s of sendSelectors) {

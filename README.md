@@ -55,7 +55,7 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 - **Placeholders.** Redacting replaces a value with a stable placeholder such as `[OPENAI_API_KEY_1]`. The real value stays in a per-tab vault in memory (never on disk). When the answer mentions the placeholder, in prose or a code block, it is highlighted and can be copied with the real value; the value never enters the page.
 - **Files and screenshots.** Text, code, PDF, Word, Excel, PowerPoint and images (read with on-device OCR) are checked before they are uploaded; a redacted text copy is offered.
 - **Hidden text.** Invisible Unicode, direction overrides and instructions aimed at the AI (prompt injection) are flagged on paste.
-- **Claude Code.** `UserPromptSubmit` blocks a prompt that holds a secret and shows a safe version; `PreToolUse` denies a tool call carrying a secret or a dangerous command and asks before reading credential files; `PostToolUse` tells the model not to repeat secrets a tool printed. Decisions are recorded for the Guard screen as masks only.
+- **Claude Code.** `UserPromptSubmit` blocks a prompt that holds a secret and shows a safe version (`[OPENAI_API_KEY_1]`). `PreToolUse` denies a tool call carrying a secret or a dangerous command; asks before reading a credential file *or any file that holds a secret* (it looks first); and routes the output of read-only shell commands (`grep`, `cat`, `env`, `git diff`...) through the redactor, so the model sees placeholders, not values. `PostToolUse` tells the model not to repeat secrets that reached it some other way. Decisions are recorded for the Guard screen as masks only. Tested against the real Claude Code CLI.
 
 What it keeps: a site, a time, what happened, and masks such as `sk-p... (len 48)` with keyed fingerprints. Never the text.
 
@@ -72,7 +72,7 @@ cd engine && cargo test                            # Rust engine
 
 ## Limits of the guard
 
-It protects people who want to be protected: it cannot stop someone who turns it off, or an AI app it is not installed in. Detection is a safety net, not a guarantee. Screenshots are read with OCR, which can misread characters. Prompt-injection checks are heuristics. Claude Code hooks cannot rewrite a prompt, only block it, so the safe version is shown for you to send. The extension has been tested against mock chat apps built on the same editors as the real sites, not against the live sites, whose markup changes often.
+It protects people who want to be protected: it cannot stop someone who turns it off, or an AI app it is not installed in. Detection is a safety net, not a guarantee. Screenshots are read with OCR, which can misread characters. Prompt-injection checks are heuristics. Claude Code hooks cannot rewrite a prompt, only block it, so the safe version is shown for you to send. The extension is tested against mock chat apps built on the same editors as the real sites, and was driven on the live, logged-out ChatGPT in Brave (stop, redact & send, the real answer's placeholder copied back, paste); the other sites need a login and have not been driven live. The Claude Code hooks cannot change what a built-in tool other than a shell command prints, so output of `Grep` or `Read` on a file that was allowed is not redacted.
 
 ![Shadow Lens overview](docs/screenshots/overview.png)
 

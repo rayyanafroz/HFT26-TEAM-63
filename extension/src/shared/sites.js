@@ -5,7 +5,7 @@ export const SITES = [
   { id: "chatgpt", name: "ChatGPT", hosts: ["chatgpt.com", "chat.openai.com"], adapter: "chatgpt" },
   { id: "claude", name: "Claude", hosts: ["claude.ai"], adapter: "claude" },
   { id: "gemini", name: "Gemini", hosts: ["gemini.google.com"], adapter: "gemini" },
-  { id: "copilot", name: "Microsoft Copilot", hosts: ["copilot.microsoft.com"], adapter: "generic" },
+  { id: "copilot", name: "Microsoft Copilot", hosts: ["copilot.microsoft.com", "copilot.com"], adapter: "generic" },
   { id: "perplexity", name: "Perplexity", hosts: ["www.perplexity.ai", "perplexity.ai"], adapter: "generic" },
   { id: "deepseek", name: "DeepSeek", hosts: ["chat.deepseek.com"], adapter: "generic" },
   { id: "mistral", name: "Mistral Le Chat", hosts: ["chat.mistral.ai"], adapter: "generic" },

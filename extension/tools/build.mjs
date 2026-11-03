@@ -35,6 +35,8 @@ function manifest() {
     manifest_version: 3,
     name: "Shadow Lens",
     version: pkg.version,
+    // Shown in the popup and settings, so a stale build (Chrome does not reload unpacked extensions) is easy to spot.
+    version_name: `${pkg.version} (built ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC)`,
     description: "Stops API keys, passwords and personal data before they are pasted, sent or uploaded to an AI chat. Everything is checked on your device.",
     minimum_chrome_version: "116",
     key,

@@ -122,7 +122,7 @@
           <article class="card">
             <h3>In your coding agent</h3>
             <p>Hooks for Claude Code check the prompt, the tool call, and what the tool printed. It uses the same rules as the dashboard's agent view.</p>
-            <ul class="ticks"><li>A prompt with a key is blocked, with a safe version to send instead</li><li>Reading <code>.env</code> or <code>~/.ssh</code> asks first</li><li>Dangerous shell commands are denied</li></ul>
+            <ul class="ticks"><li>A prompt with a key is blocked, with a safe version to send instead</li><li>Reading <code>.env</code>, <code>~/.ssh</code> or any file that holds a key asks first</li><li><code>grep</code>, <code>cat</code> and <code>git diff</code> output reaches the model redacted</li><li>Dangerous shell commands are denied</li></ul>
           </article>
           <article class="card">
             <h3>In files and screenshots</h3>

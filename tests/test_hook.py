@@ -36,7 +36,7 @@ def test_a_prompt_with_a_key_is_blocked_with_masks_and_a_safe_version():
     assert d["action"] == "block"
     assert KEY not in d["message"], "the person is shown a mask, never the key"
     assert "OpenAI-style API key" in d["message"] and "sk-p..." in d["message"]
-    assert "[REDACTED:SEC_OPENAI_KEY:" in d["message"], "a safe version is offered"
+    assert "OPENAI_API_KEY=[OPENAI_API_KEY_1] what is wrong?" in d["message"], "a safe version is offered, named as in the browser"
     assert KEY not in d["redacted"]
 
 
@@ -255,3 +255,62 @@ def test_precommit_looks_only_at_added_lines(tmp_path, monkeypatch, capsys):
     run_git("add", ".")
     assert hook.cli(["precommit"]) == 1
     assert "new.txt" in capsys.readouterr().out
+
+
+# ---- what tools print: read-only commands go through the redactor; files are looked at before a Read ------
+
+def test_a_read_only_command_is_rewritten_to_redact_its_output():
+    d = hook.decide_tool("Bash", {"command": "grep -rn OPENAI_API_KEY .", "description": "search"}, SETTINGS, OPTIONS)
+    assert d["action"] == "allow"
+    assert d["updated_input"]["description"] == "search", "the rest of the input is kept"
+    assert d["updated_input"]["command"].startswith("set -o pipefail; { grep -rn OPENAI_API_KEY . ; } 2>&1 | ")
+    assert d["updated_input"]["command"].endswith(" redact-stream")
+
+
+@pytest.mark.parametrize("command", ["python app.py", "cat a > b", "git push", "echo $(cat x)", "npm test", "find . -delete"])
+def test_other_commands_are_not_rewritten(command):
+    assert hook.decide_tool("Bash", {"command": command}, SETTINGS, OPTIONS)["updated_input"] is None
+
+
+def test_warn_and_off_modes_do_not_rewrite_commands():
+    for mode in ("warn", "off"):
+        assert hook.decide_tool("Bash", {"command": "cat notes.txt"}, SETTINGS, hook.Options({"SHADOWLENS_HOOK_MODE": mode}))["updated_input"] is None
+
+
+def test_reading_an_ordinary_file_that_holds_a_key_asks_first(tmp_path):
+    (tmp_path / "config.py").write_text(f'KEY = "{KEY}"\n')
+    (tmp_path / "app.py").write_text("print('hello')\n")
+    d = hook.decide_tool("Read", {"file_path": "config.py"}, SETTINGS, OPTIONS, cwd=str(tmp_path))
+    assert d["action"] == "ask" and "holds a secret" in d["reason"] and KEY not in d["reason"] and "sk-p..." in d["reason"]
+    assert hook.decide_tool("Read", {"file_path": str(tmp_path / "app.py")}, SETTINGS, OPTIONS)["action"] == "allow"
+    assert hook.decide_tool("Read", {"file_path": "missing.py"}, SETTINGS, OPTIONS, cwd=str(tmp_path))["action"] == "allow"
+
+
+def test_friendly_redaction_numbers_values_and_keeps_repeats_together():
+    other = fake("openai_key", 2)
+    text = f"a {KEY} b {other} c {KEY} mail {fake('email', 1)}"
+    result = hook.analyze(text, SETTINGS)
+    assert hook.friendly_redact(text, result.findings) == "a [OPENAI_API_KEY_1] b [OPENAI_API_KEY_2] c [OPENAI_API_KEY_1] mail [EMAIL_1]"
+
+
+def test_more_random_tokens_than_the_engine_s_default_cap_are_all_replaced():
+    tokens = [fake("aws_secret_key", i) + "9" for i in range(6)]
+    text = "\n".join(f"x{i} {t}" for i, t in enumerate(tokens))
+    out = hook.friendly_redact(text, hook.analyze(text, SETTINGS).findings)
+    assert not any(t in out for t in tokens)
+
+
+def test_the_wrapped_command_really_redacts_and_keeps_the_exit_status(tmp_path):
+    hook.write_launcher()
+    (tmp_path / ".env").write_text(f"DEBUG=1\nOPENAI_API_KEY={KEY}\n")
+    env = {**{k: v for k, v in os.environ.items() if not k.startswith("SHADOWLENS_")}, "SHADOWLENS_RESOLVE": "false"}
+    found = subprocess.run(["bash", "-c", hook.redacting("grep -rn OPENAI_API_KEY .")], cwd=tmp_path, capture_output=True, text=True, env=env, timeout=60)
+    assert found.returncode == 0 and found.stdout == "./.env:2:OPENAI_API_KEY=[OPENAI_API_KEY_1]\n"
+    missing = subprocess.run(["bash", "-c", hook.redacting("grep -rn NOT_THERE .")], cwd=tmp_path, capture_output=True, text=True, env=env, timeout=60)
+    assert missing.returncode == 1, "grep's 'not found' still reaches the agent"
+
+
+def test_pre_tool_use_returns_the_rewritten_command_in_claude_codes_format(tmp_path):
+    _, reply, _ = run({"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "cat notes.txt"}}, tmp_path)
+    out = reply["hookSpecificOutput"]
+    assert out["permissionDecision"] == "allow" and out["updatedInput"]["command"].endswith("redact-stream")

@@ -141,9 +141,7 @@ export function createGuard({ adapter, ui, send, site, config }) {
     if (!active() || passThrough.has(e) || !isSendKey(e)) return;
     const editor = adapter.editableRoot(e.target);
     if (!editor || editor instanceof HTMLInputElement) return;
-    if (!adapter.isComposer(editor) && !editor.contains(adapter.composer())) {
-      if (adapter.id !== "generic") return; // another field (a search box, a title): not a message
-    }
+    if (!adapter.isComposer(editor) && !editor.contains(adapter.composer())) return; // a search box or a title: not a message
     intercept(e, editor, { kind: "enter", ctrl: e.ctrlKey, meta: e.metaKey });
   }
 
@@ -253,6 +251,8 @@ export function createGuard({ adapter, ui, send, site, config }) {
       await new Promise((r) => setTimeout(r, 25));
       button = trigger.kind === "click" && trigger.control.isConnected ? trigger.control : adapter.findSend(editor);
     }
+    // The site empties the composer itself (no input event), so check it again a moment later.
+    setTimeout(() => checkTyping(editor), 800);
     if (button && !button.disabled) {
       button.click();
       return;
@@ -375,7 +375,9 @@ export function createGuard({ adapter, ui, send, site, config }) {
       // Documents and images are read in the background and can take a few seconds: say what is happening.
       const reading = files.some(needsReader) ? ui.toast("Reading the file on this device\u2026 nothing leaves it.", 120_000) : null;
       for (const file of files) {
-        if (file.size > cfg.maxFileBytes) {
+        // Screenshots from high-resolution screens are often over the text limit; give images more room.
+        const limit = /^image\//.test(file.type) || /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name) ? Math.max(cfg.maxFileBytes, 20 * 1024 * 1024) : cfg.maxFileBytes;
+        if (file.size > limit) {
           unchecked.push(`${file.name} (too large to check)`);
           continue;
         }

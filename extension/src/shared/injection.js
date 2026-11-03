@@ -31,8 +31,8 @@ export function decodeTags(run) {
 export function inspect(text) {
   const findings = [];
   const hidden = [];
-  for (const m of text.matchAll(TAG_RUN)) hidden.push({ range: [m.index, m.index + m[0].length], what: `hidden message "${decodeTags(m[0]).slice(0, 80)}"` });
-  for (const m of text.matchAll(BIDI)) hidden.push({ range: [m.index, m.index + m[0].length], what: "text-direction override" });
+  for (const m of text.matchAll(TAG_RUN)) hidden.push({ range: [m.index, m.index + m[0].length], what: `hidden message "${decodeTags(m[0]).slice(0, 80)}"`, serious: true });
+  for (const m of text.matchAll(BIDI)) hidden.push({ range: [m.index, m.index + m[0].length], what: "text-direction override", serious: true });
   for (const m of text.matchAll(ZERO_WIDTH_RUN)) {
     // Emoji sequences use joiners between pictographs; those are normal.
     const before = text.slice(Math.max(0, m.index - 2), m.index);
@@ -42,7 +42,9 @@ export function inspect(text) {
   }
   if (hidden.length) {
     findings.push({
-      rule_id: "HIDDEN_TEXT", severity: "high", hash12: "000000000000",
+      // Zero-width characters alone are common in text copied from web pages: they warn. A hidden message
+      // or a direction override is an attack shape: it blocks.
+      rule_id: "HIDDEN_TEXT", severity: hidden.some((h) => h.serious) ? "high" : "medium", hash12: "000000000000",
       masked_preview: hidden.map((h) => h.what).slice(0, 3).join("; "),
       ranges: hidden.map((h) => h.range), count: hidden.length,
     });
