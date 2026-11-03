@@ -17,14 +17,19 @@ const cspViolations = [];
 
 before(async () => {
   // The real production server, so the Content-Security-Policy it sends is enforced in these tests.
-  const { spawn } = await import("node:child_process");
-  const port = 20000 + Math.floor(Math.random() * 20000);
-  server = spawn(process.execPath, [join(here, "dist", "server.mjs")], { env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "inherit"] });
-  await new Promise((resolve, reject) => {
-    server.stdout.on("data", (d) => String(d).includes("Shadow Lens site") && resolve());
-    server.on("exit", (code) => reject(new Error(`server exited ${code}`)));
-  });
-  base = `http://localhost:${port}`;
+  // SITE_URL=https://... runs the same tests against a deployed copy instead.
+  if (process.env.SITE_URL) {
+    base = process.env.SITE_URL.replace(/\/$/, "");
+  } else {
+    const { spawn } = await import("node:child_process");
+    const port = 20000 + Math.floor(Math.random() * 20000);
+    server = spawn(process.execPath, [join(here, "dist", "server.mjs")], { env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "inherit"] });
+    await new Promise((resolve, reject) => {
+      server.stdout.on("data", (d) => String(d).includes("Shadow Lens site") && resolve());
+      server.on("exit", (code) => reject(new Error(`server exited ${code}`)));
+    });
+    base = `http://localhost:${port}`;
+  }
   browser = await chromium.launch({ channel: "chromium" });
 });
 after(async () => {
@@ -144,10 +149,11 @@ test("the server serves the page and the engine, and nothing else", async () => 
   const wasm = await get("/shadowlens_engine.wasm");
   assert.equal(wasm.headers.get("content-type"), "application/wasm");
   for (const hidden of ["/server.mjs", "/package.json", "/.env", "/..%2Fserver.mjs", "/%2e%2e/server.mjs", "/fonts/", "/nope"]) {
-    assert.equal((await get(hidden)).status, 404, hidden);
+    const status = (await get(hidden)).status;
+    assert.ok(status === 404 || status === 400, `${hidden} was ${status}: refused either way, never served`);
   }
   assert.equal((await get("/", { method: "POST" })).status, 405);
-  assert.equal((await get("/healthz")).status, 200);
+  if (!process.env.SITE_URL) assert.equal((await get("/healthz")).status, 200);  // our own server only
   const first = await get("/");
   const again = await get("/", { headers: { "if-none-match": first.headers.get("etag") } });
   assert.equal(again.status, 304);

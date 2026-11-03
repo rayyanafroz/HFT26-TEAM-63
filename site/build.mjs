@@ -6,7 +6,7 @@
 // Needs the engine built first: node extension/tools/build-engine.mjs (and `npm install` in extension/).
 
 import { createRequire } from "node:module";
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,7 +29,24 @@ await esbuild.build({
   entryPoints: [join(here, "src", "demo.js")], bundle: true, format: "esm", target: ["chrome116", "firefox120", "safari17"],
   outfile: join(dist, "demo.js"), minify: true, legalComments: "none", logLevel: "warning",
 });
-for (const file of ["index.html", "styles.css", "server.mjs", "package.json"]) cpSync(join(here, "src", file), join(dist, file));
+// --static: for hosts that serve files themselves (Vercel, Netlify, GitHub Pages): no server, and the
+// headers the server would send go into vercel.json instead.
+const staticHost = process.argv.includes("--static");
+for (const file of staticHost ? ["index.html", "styles.css"] : ["index.html", "styles.css", "server.mjs", "package.json"]) cpSync(join(here, "src", file), join(dist, file));
+if (staticHost) {
+  // The same header list the server sends, read from the server's own source so the two cannot drift.
+  const source = readFileSync(join(here, "src", "server.mjs"), "utf8");
+  const block = source.match(/const SECURITY = (\{[\s\S]*?\n\});/)[1];
+  const headers = Function(`"use strict"; return (${block});`)();
+  writeFileSync(join(dist, "vercel.json"), JSON.stringify({
+    cleanUrls: true,
+    headers: [
+      { source: "/(.*)", headers: Object.entries(headers).map(([key, value]) => ({ key, value })) },
+      { source: "/(.*)\\.wasm", headers: [{ key: "Content-Type", value: "application/wasm" }, { key: "Cache-Control", value: "public, max-age=3600" }] },
+      { source: "/", headers: [{ key: "Cache-Control", value: "no-cache" }] },
+    ],
+  }, null, 2) + "\n");
+}
 cpSync(join(here, "src", "assets"), join(dist, "assets"), { recursive: true });
 cpSync(join(repo, "ui", "fonts"), join(dist, "fonts"), { recursive: true });
 cpSync(wasm, join(dist, "shadowlens_engine.wasm"));
