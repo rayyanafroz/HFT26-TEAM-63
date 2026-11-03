@@ -275,10 +275,12 @@ export function createUI() {
     placeBadge();
   }
 
+  /** A short notice. Returns `{ remove }` for one that should go as soon as the work it reports is done. */
   function toast(message, ms = 3500) {
     const t = h("div", { class: "toast", role: "status" }, message);
     layer.append(t);
-    setTimeout(() => t.remove(), ms);
+    const timer = setTimeout(() => t.remove(), ms);
+    return { remove: () => (clearTimeout(timer), t.remove()) };
   }
 
   function destroy() {

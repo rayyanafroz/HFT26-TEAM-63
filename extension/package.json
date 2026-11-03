@@ -11,6 +11,7 @@
     "test:e2e": "node tools/build.mjs --test && node --test --test-concurrency=1 tests/e2e/"
   },
   "devDependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
     "esbuild": "^0.28.2",
     "fflate": "^0.8.3",
     "pdfjs-dist": "^6.5.438",
@@ -21,6 +22,7 @@
     "prosemirror-schema-basic": "^1.2.5",
     "prosemirror-state": "^1.4.4",
     "prosemirror-view": "^1.42.9",
-    "quill": "^2.0.3"
+    "quill": "^2.0.3",
+    "tesseract.js": "^7.0.0"
   }
 }

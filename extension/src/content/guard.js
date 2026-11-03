@@ -11,7 +11,7 @@
 
 import { clean } from "../shared/injection.js";
 import { insertAt, isWriting, readText, saveSelection, writeText, dispatchPaste } from "./editor.js";
-import { DOCUMENTS, extractText, toBase64 } from "./files.js";
+import { extractText, needsReader, toBase64 } from "./files.js";
 
 const TYPING_DELAY_MS = 150;
 const BYPASS_MS = 2500;
@@ -372,6 +372,8 @@ export function createGuard({ adapter, ui, send, site, config }) {
     try {
       const checked = [];
       const unchecked = [];
+      // Documents and images are read in the background and can take a few seconds: say what is happening.
+      const reading = files.some(needsReader) ? ui.toast("Reading the file on this device\u2026 nothing leaves it.", 120_000) : null;
       for (const file of files) {
         if (file.size > cfg.maxFileBytes) {
           unchecked.push(`${file.name} (too large to check)`);
@@ -384,6 +386,7 @@ export function createGuard({ adapter, ui, send, site, config }) {
         }
         checked.push({ file, text, result: await scan(text, "file") });
       }
+      reading?.remove();
       const flagged = checked.filter((c) => !c.result.enabled ? false : !PASSES.has(c.result.decision.action));
       if (!flagged.length) {
         if (unchecked.length) ui.toast(`Shadow Lens could not look inside: ${unchecked.join(", ")}.`, 5000);
@@ -402,9 +405,9 @@ export function createGuard({ adapter, ui, send, site, config }) {
         const replacements = new Map();
         for (const c of flagged) {
           const redacted = await send("redact", { text: c.text, kind: "file", site: site.id, cleanHidden: true });
-          // A document (PDF, Word...) becomes its redacted text, so it is renamed and typed as plain text;
+          // A document or an image (read as text) becomes its redacted text, so it is renamed and typed as plain text;
           // a text file keeps its name and type.
-          const document_ = DOCUMENTS.test(c.file.name);
+          const document_ = needsReader(c.file);
           const name = document_ ? `${c.file.name}.redacted.txt` : c.file.name;
           replacements.set(c.file, new File([redacted.text], name, { type: document_ ? "text/plain" : c.file.type || "text/plain", lastModified: Date.now() }));
           record("redacted", "file", c.result, { file: c.file.name });

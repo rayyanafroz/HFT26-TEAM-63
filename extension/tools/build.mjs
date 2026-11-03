@@ -113,6 +113,14 @@ async function build() {
     cpSync(src(page), out(page));
   }
   cpSync(join(root, "node_modules/pdfjs-dist/build/pdf.worker.min.mjs"), out("offscreen/pdf.worker.min.mjs"));
+  // On-device OCR for screenshots: the worker, the LSTM-only cores (the right one is chosen for the CPU) and English.
+  const tess = join(root, "node_modules", "tesseract.js-core");
+  mkdirSync(out("tesseract/lang"), { recursive: true });
+  cpSync(join(root, "node_modules/tesseract.js/dist/worker.min.js"), out("tesseract/worker.min.js"));
+  for (const core of ["tesseract-core-relaxedsimd-lstm.wasm.js", "tesseract-core-simd-lstm.wasm.js", "tesseract-core-lstm.wasm.js"]) {
+    cpSync(join(tess, core), out(`tesseract/${core}`));
+  }
+  cpSync(join(root, "node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz"), out("tesseract/lang/eng.traineddata.gz"));
   cpSync(wasm, out("engine/shadowlens_engine.wasm"));
   cpSync(join(root, "..", "ui", "fonts"), out("fonts"), { recursive: true });
   mkdirSync(out("icons"));

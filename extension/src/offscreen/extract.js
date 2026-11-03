@@ -2,6 +2,7 @@
 
 import * as pdfjs from "pdfjs-dist";
 import { unzipSync, strFromU8 } from "fflate";
+import { createWorker } from "tesseract.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdf.worker.min.mjs", import.meta.url).href;
 
@@ -70,8 +71,47 @@ function officeText(name, bytes) {
   return null;
 }
 
+// ---- images: text read off screenshots and photos, with Tesseract (WebAssembly), on this device ----
+
+const IMAGE_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", bmp: "image/bmp", gif: "image/gif" };
+const IDLE_MS = 60_000;
+let ocr = null; // a promise for the worker, started on first use
+let idleTimer = null;
+
+function ocrWorker() {
+  ocr ??= createWorker("eng", 1, {                         // 1: the LSTM engine only, which is what ships
+    workerPath: chrome.runtime.getURL("tesseract/worker.min.js"),
+    corePath: chrome.runtime.getURL("tesseract"),          // a folder: the right WebAssembly build is chosen for this CPU
+    langPath: chrome.runtime.getURL("tesseract/lang"),
+    cacheMethod: "none",
+    workerBlobURL: false,
+  }).catch((error) => {
+    ocr = null;
+    throw error;
+  });
+  return ocr;
+}
+
+async function imageText(name, bytes) {
+  const type = IMAGE_TYPES[name.split(".").pop().toLowerCase()] ?? "image/png";
+  const worker = await ocrWorker();
+  clearTimeout(idleTimer);
+  try {
+    const { data } = await worker.recognize(new Blob([bytes], { type }));
+    return data.text;
+  } finally {
+    // The recogniser holds tens of megabytes: let it go when images stop coming.
+    idleTimer = setTimeout(() => {
+      const done = ocr;
+      ocr = null;
+      done?.then((w) => w.terminate()).catch(() => {});
+    }, IDLE_MS);
+  }
+}
+
 export async function extract(name, base64) {
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
   if (/\.pdf$/i.test(name)) return pdfText(bytes);
+  if (/\.(png|jpe?g|webp|bmp|gif)$/i.test(name)) return imageText(name, bytes);
   return officeText(name, bytes);
 }
