@@ -47,7 +47,7 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m shadowlens.hook precommit          # what is staged in git
 ```
 
-**The landing page:** `node site/build.mjs --serve` and open http://localhost:8000.
+**The landing page:** `node site/build.mjs --serve` and open http://localhost:8000. To host it (Railway, Render, Fly, any Node host): `node site/build.mjs --out ../shadow-lens-site`, then deploy that folder; it holds only public files and a dependency-free `server.mjs` that `npm start` runs on `$PORT`.
 
 ## How the guard works
 

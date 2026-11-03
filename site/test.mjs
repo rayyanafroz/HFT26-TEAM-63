@@ -3,40 +3,33 @@
 //   node site/build.mjs && node --test site/test.mjs
 
 import { createRequire } from "node:module";
-import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
-import { dirname, extname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { chromium } = createRequire(join(here, "..", "extension", "package.json"))("playwright");
-const types = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".wasm": "application/wasm", ".png": "image/png", ".woff2": "font/woff2" };
 
 let server, browser, base;
 const requests = [];
+const cspViolations = [];
 
 before(async () => {
-  server = createServer(async (req, res) => {
-    let path = new URL(req.url, "http://x").pathname;
-    if (path === "/") path = "/index.html";
-    let body;
-    try {
-      body = await readFile(join(here, "dist", path));
-    } catch {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { "content-type": types[extname(path)] ?? "application/octet-stream" }).end(body);
+  // The real production server, so the Content-Security-Policy it sends is enforced in these tests.
+  const { spawn } = await import("node:child_process");
+  const port = 20000 + Math.floor(Math.random() * 20000);
+  server = spawn(process.execPath, [join(here, "dist", "server.mjs")], { env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "inherit"] });
+  await new Promise((resolve, reject) => {
+    server.stdout.on("data", (d) => String(d).includes("Shadow Lens site") && resolve());
+    server.on("exit", (code) => reject(new Error(`server exited ${code}`)));
   });
-  await new Promise((resolve) => server.listen(0, resolve));
-  base = `http://localhost:${server.address().port}`;
+  base = `http://localhost:${port}`;
   browser = await chromium.launch({ channel: "chromium" });
 });
 after(async () => {
   await browser?.close();
-  server?.close();
+  server?.kill();
 });
 
 async function open(viewport = { width: 1440, height: 900 }, scheme = "light") {
@@ -45,6 +38,7 @@ async function open(viewport = { width: 1440, height: 900 }, scheme = "light") {
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("request", (r) => requests.push(r.url()));
+  page.on("console", (m) => /content security policy/i.test(m.text()) && cspViolations.push(m.text()));
   await page.goto(base);
   await page.waitForFunction(() => !document.getElementById("verdict").textContent.includes("Loading"));
   return { page, errors };
@@ -127,4 +121,35 @@ test("dark mode renders without errors", async () => {
   const { page, errors } = await open({ width: 1200, height: 800 }, "dark");
   assert.deepEqual(errors, []);
   await page.close();
+});
+
+test("the strict Content-Security-Policy is sent and the page does not break it", async () => {
+  const { page, errors } = await open();
+  await page.click('[data-preset="env"]');
+  await page.locator("label.switch").click();
+  await page.waitForTimeout(300);
+  assert.deepEqual(cspViolations, []);
+  assert.deepEqual(errors, []);
+  const response = await page.request.get(base);
+  const headers = response.headers();
+  assert.match(headers["content-security-policy"], /script-src 'self' 'wasm-unsafe-eval'/);
+  assert.equal(headers["x-content-type-options"], "nosniff");
+  assert.equal(headers["x-frame-options"], "DENY");
+  await page.close();
+});
+
+test("the server serves the page and the engine, and nothing else", async () => {
+  const get = (path, init) => fetch(base + path, init);
+  assert.equal((await get("/")).status, 200);
+  const wasm = await get("/shadowlens_engine.wasm");
+  assert.equal(wasm.headers.get("content-type"), "application/wasm");
+  for (const hidden of ["/server.mjs", "/package.json", "/.env", "/..%2Fserver.mjs", "/%2e%2e/server.mjs", "/fonts/", "/nope"]) {
+    assert.equal((await get(hidden)).status, 404, hidden);
+  }
+  assert.equal((await get("/", { method: "POST" })).status, 405);
+  assert.equal((await get("/healthz")).status, 200);
+  const first = await get("/");
+  const again = await get("/", { headers: { "if-none-match": first.headers.get("etag") } });
+  assert.equal(again.status, 304);
+  assert.ok(Number((await get("/demo.js", { headers: { "accept-encoding": "br" } })).headers.get("content-length")) < 20000, "compressed");
 });

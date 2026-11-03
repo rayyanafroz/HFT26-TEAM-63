@@ -1,0 +1,10 @@
+{
+  "name": "shadow-lens-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Shadow Lens landing page (static files and a tiny server)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.mjs" },
+  "license": "MIT"
+}
