@@ -5,7 +5,7 @@ import { EditorView } from "prosemirror-view";
 import { schema } from "prosemirror-schema-basic";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, chainCommands, exitCode } from "prosemirror-commands";
-import { el, record, reply, watchFiles } from "./common.js";
+import { el, record, replyInto, watchFiles } from "./common.js";
 
 const claude = window.__variant === "claude";
 const thread = document.getElementById("thread");
@@ -23,8 +23,9 @@ function send() {
   const user = claude ? el("div", { "data-testid": "user-message" }, message) : el("div", { "data-message-author-role": "user" }, message);
   thread.append(user);
   setTimeout(() => {
-    const answer = reply(message);
-    thread.append(claude ? el("div", { class: "font-claude-response" }, answer) : el("div", { "data-message-author-role": "assistant" }, answer));
+    const box = claude ? el("div", { class: "font-claude-response" }) : el("div", { "data-message-author-role": "assistant" });
+    replyInto(box, message);
+    thread.append(box);
   }, 30);
   view.dispatch(view.state.tr.delete(0, view.state.doc.content.size));
   return true;

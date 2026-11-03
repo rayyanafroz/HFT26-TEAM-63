@@ -85,7 +85,7 @@ def seed(db, n=0, **finding_overrides):
 def test_creates_the_expected_tables(db):
     assert set(db.table_columns()) == {
         "events", "findings", "alerts", "remediations", "agent_activity", "llm_calls",
-        "provider_overrides", "source_offsets", "counters"}
+        "provider_overrides", "source_offsets", "counters", "guard_events"}
 
 
 def test_schema_is_idempotent_and_versioned(tmp_path):

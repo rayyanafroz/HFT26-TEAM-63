@@ -57,7 +57,7 @@ test("a key is stopped; Redact & send sends a placeholder and the AI's answer ca
   const chip = page.locator("shadow-lens .chip");
   await chip.first().waitFor();
   assert.ok(await page.evaluate(() => CSS.highlights.get("shadowlens-restorable")?.size > 0));
-  await chip.last().getByRole("button", { name: "Copy with real values" }).click();
+  await chip.last().getByRole("button", { name: /Copy .*real values/ }).click();
   await page.waitForFunction(async (k) => (await navigator.clipboard.readText()).includes(k), key);
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   assert.ok(copied.includes(`export VALUE=${key}`));

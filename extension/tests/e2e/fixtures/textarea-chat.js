@@ -1,6 +1,6 @@
 // A plain <textarea> chat, for the generic adapter (DeepSeek, Perplexity and the like).
 
-import { el, record, reply, watchFiles } from "./common.js";
+import { el, record, replyInto, watchFiles } from "./common.js";
 
 const thread = document.getElementById("thread");
 const box = document.getElementById("box");
@@ -11,7 +11,11 @@ function send() {
   if (!message) return;
   record(message);
   thread.append(el("article", { class: "message user" }, message));
-  setTimeout(() => thread.append(el("article", { class: "message assistant" }, reply(message))), 30);
+  setTimeout(() => {
+    const box = el("article", { class: "message assistant" });
+    replyInto(box, message);
+    thread.append(box);
+  }, 30);
   box.value = "";
 }
 box.addEventListener("keydown", (e) => {

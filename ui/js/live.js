@@ -4,7 +4,7 @@ import { api, MOCK } from "./api.js";
 import { store } from "./store.js";
 
 const POLL_MS = 3000;
-const TYPES = ["event.new", "finding.new", "alert.new", "score.update", "remediation.update", "scenario.progress", "reset"];
+const TYPES = ["event.new", "finding.new", "alert.new", "score.update", "remediation.update", "scenario.progress", "reset", "guard.new"];
 
 let state = "connecting";          // "connecting" | "live" | "reconnecting" | "mock"
 let source = null;

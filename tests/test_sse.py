@@ -35,7 +35,7 @@ def test_message_format_for_dicts_and_models():
 
 def test_event_types_are_the_documented_list():
     assert EVENT_TYPES == {"event.new", "finding.new", "alert.new", "score.update",
-                           "remediation.update", "scenario.progress", "reset"}
+                           "remediation.update", "scenario.progress", "reset", "guard.new"}
 
 
 def test_unknown_event_types_are_refused():

@@ -7,6 +7,11 @@ import { ruleInfo } from "./rules.js";
 
 export const PLACEHOLDER_RE = /\[([A-Z][A-Z0-9_]*_\d+)\]/g;
 
+// How a model may write a placeholder back: [NAME_1] as given, or <NAME_1>, {{NAME_1}}, or the bare
+// NAME_1. The name must stand alone (not inside a longer identifier), and only names this tab's vault
+// holds are restored, so unrelated text is never touched.
+export const LOOSE_PLACEHOLDER_RE = /(?<![A-Za-z0-9_])(?:\[|<|\{\{)?([A-Z][A-Z0-9_]*_\d+)(?:\]|>|\}\})?(?![A-Za-z0-9_])/g;
+
 export function emptyVault() {
   return { byKey: {}, counters: {}, values: {} };
 }
@@ -56,14 +61,14 @@ export function redact(text, findings, vault) {
   return { text: out, replaced: [...replaced.values()] };
 }
 
-/** Put real values back for every placeholder this vault knows; others stay as written. */
+/** Put real values back for every placeholder this vault knows (in any of the written forms); others stay as written. */
 export function restore(text, vault) {
-  return text.replace(PLACEHOLDER_RE, (whole) => (whole in vault.values ? vault.values[whole] : whole));
+  return text.replace(LOOSE_PLACEHOLDER_RE, (whole, name) => (`[${name}]` in vault.values ? vault.values[`[${name}]`] : whole));
 }
 
-/** The placeholders that appear in `text` and that this vault can restore. */
+/** The placeholders that appear in `text` and that this vault can restore, as "[NAME_1]". */
 export function knownPlaceholders(text, vault) {
   const found = new Set();
-  for (const m of text.matchAll(PLACEHOLDER_RE)) if (m[0] in vault.values) found.add(m[0]);
+  for (const m of text.matchAll(LOOSE_PLACEHOLDER_RE)) if (`[${m[1]}]` in vault.values) found.add(`[${m[1]}]`);
   return [...found];
 }

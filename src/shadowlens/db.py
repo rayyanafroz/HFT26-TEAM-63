@@ -184,10 +184,26 @@ CREATE TABLE IF NOT EXISTS counters (
     name   TEXT PRIMARY KEY,
     amount INTEGER NOT NULL DEFAULT 0
 );
+
+-- What the guard (browser extension, Claude Code hooks, clipboard watcher, scan command) did.
+-- Masks and keyed hashes of what was found, never the text (see guard.clean_event).
+CREATE TABLE IF NOT EXISTS guard_events (
+    id       TEXT PRIMARY KEY,
+    at       TEXT NOT NULL,
+    source   TEXT NOT NULL,
+    site     TEXT NOT NULL,
+    action   TEXT NOT NULL,
+    kind     TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    reason   TEXT,
+    findings TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS guard_events_at ON guard_events(at);
 """
 
 # Tables cleared by reset(), children first. source_offsets is kept on purpose so a
-# reset does not make the transcript reader re-read old history.
+# reset does not make the transcript reader re-read old history, and guard_events because
+# they are the person's real history of what the guard stopped, not demo data.
 _RESET_ORDER = (
     "llm_calls", "agent_activity", "remediations", "alerts", "findings", "events",
     "provider_overrides", "counters",
@@ -715,6 +731,41 @@ class Database:
     def last_event_at(self) -> str | None:
         row = self._one("SELECT MAX(ts) AS ts FROM events")
         return row["ts"] if row else None
+
+    # ---- guard events ----------------------------------------------------
+
+    def insert_guard_event(self, event: dict[str, Any]) -> bool:
+        """Store a cleaned guard event (``guard.clean_event``). The same id is stored once."""
+        return self._run(
+            "INSERT OR IGNORE INTO guard_events (id, at, source, site, action, kind, severity, reason, findings) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (event["id"], event["at"], event["source"], event["site"], event["action"], event["kind"],
+             event["severity"], event["reason"], _dumps(event["findings"])),
+        ) > 0
+
+    @staticmethod
+    def _guard_from_row(r: sqlite3.Row) -> dict[str, Any]:
+        return {k: r[k] for k in ("id", "at", "source", "site", "action", "kind", "severity", "reason")} | {
+            "findings": json.loads(r["findings"])}
+
+    def list_guard_events(self, limit: int | None = None, offset: int | None = None,
+                          since: str | None = None) -> tuple[list[dict[str, Any]], int]:
+        lim, off = clamp_page(limit, offset)
+        where, params = ("WHERE at >= ?", (since,)) if since else ("", ())
+        rows = self._all(f"SELECT * FROM guard_events {where} ORDER BY at DESC, id LIMIT ? OFFSET ?", (*params, lim, off))
+        return [self._guard_from_row(r) for r in rows], self._count(f"SELECT COUNT(*) FROM guard_events {where}", params)
+
+    def guard_events_since(self, since: str) -> list[dict[str, Any]]:
+        return [self._guard_from_row(r) for r in self._all("SELECT * FROM guard_events WHERE at >= ? ORDER BY at", (since,))]
+
+    def guard_cursor(self) -> int:
+        """Grows whenever a guard event is added (by any process): the server watches it."""
+        return self._count("SELECT COALESCE(MAX(rowid), 0) FROM guard_events")
+
+    def last_guard_event_at(self, source: str | None = None) -> str | None:
+        row = (self._one("SELECT MAX(at) AS at FROM guard_events WHERE source = ?", (source,)) if source
+               else self._one("SELECT MAX(at) AS at FROM guard_events"))
+        return row["at"] if row else None
 
     # ---- reset -----------------------------------------------------------
 

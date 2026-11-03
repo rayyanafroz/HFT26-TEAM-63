@@ -28,6 +28,7 @@ from ..core.sanction import effective_sanctioned
 from ..core.score_publisher import ScorePublisher
 from ..core.views import Insights
 from ..db import Database, open_database
+from ..guard import GuardWatcher
 from ..ingest.conn_scan import ConnectionScanner
 from ..ingest.live_tail import LiveTail
 from ..ingest.sources import SourceManager
@@ -35,8 +36,8 @@ from ..llm.triage import Triage
 from ..models import ErrorResponse
 from ..providers.catalog import Catalog
 from ..providers.resolver import Resolver
-from . import (routes_capture, routes_ingest, routes_insights, routes_reports, routes_sources, routes_stream,
-               routes_system, routes_triage)
+from . import (routes_capture, routes_guard, routes_ingest, routes_insights, routes_reports, routes_sources,
+               routes_stream, routes_system, routes_triage)
 from .local_only import LocalOnly
 from .sse import EventBus
 
@@ -138,9 +139,12 @@ def create_app(
         resolver.start()                 # first: the scan waits for its first round (Resolver.wait_ready)
         capture.start_defaults()
         source_manager.start()
+        guard_watcher = GuardWatcher(app.state.db, bus.publish)
+        guard_watcher.start()
         try:
             yield
         finally:
+            guard_watcher.stop()
             source_manager.stop()
             triage.close()
             capture.shutdown()
@@ -194,6 +198,7 @@ def create_app(
     app.include_router(routes_stream.router)
     app.include_router(routes_reports.router)
     app.include_router(routes_triage.router)
+    app.include_router(routes_guard.router)
 
     # ---- dashboard files (must be added last: "/" would swallow routes) ---
     if (ui_path / "index.html").is_file():

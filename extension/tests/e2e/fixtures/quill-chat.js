@@ -1,7 +1,7 @@
 // A chat composer on Quill inside <rich-textarea>, shaped like Gemini's.
 
 import Quill from "quill/core";
-import { el, record, reply, watchFiles } from "./common.js";
+import { el, record, replyInto, watchFiles } from "./common.js";
 
 customElements.define("rich-textarea", class extends HTMLElement {});
 customElements.define("user-query", class extends HTMLElement {});
@@ -18,7 +18,11 @@ function send() {
   if (!message) return;
   record(message);
   thread.append(el("user-query", {}, message));
-  setTimeout(() => thread.append(el("model-response", {}, reply(message))), 30);
+  setTimeout(() => {
+    const box = el("model-response");
+    replyInto(box, message);
+    thread.append(box);
+  }, 30);
   quill.setText("");
 }
 quill.on("text-change", () => (button.disabled = !quill.getText().trim()));
