@@ -38,3 +38,5 @@ extension/src/engine/shadowlens_engine.wasm
 
 # Landing page build output
 site/dist/
+
+extension/samples/
