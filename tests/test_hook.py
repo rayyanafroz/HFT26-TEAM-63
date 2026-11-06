@@ -314,3 +314,15 @@ def test_pre_tool_use_returns_the_rewritten_command_in_claude_codes_format(tmp_p
     _, reply, _ = run({"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "cat notes.txt"}}, tmp_path)
     out = reply["hookSpecificOutput"]
     assert out["permissionDecision"] == "allow" and out["updatedInput"]["command"].endswith("redact-stream")
+
+
+def test_redacting_a_commands_output_is_recorded_for_the_dashboard(tmp_path):
+    hook.write_launcher()
+    (tmp_path / ".env").write_text(f"OPENAI_API_KEY={KEY}\n")
+    db_path = tmp_path / "shadow.db"
+    env = {**{k: v for k, v in os.environ.items() if not k.startswith("SHADOWLENS_")}, "SHADOWLENS_RESOLVE": "false", "SHADOWLENS_DB_PATH": str(db_path)}
+    subprocess.run(["bash", "-c", hook.redacting("cat .env")], cwd=tmp_path, capture_output=True, text=True, env=env, timeout=60)
+    with Database(db_path) as db:
+        [event], total = db.list_guard_events()
+        assert total == 1 and event["action"] == "redacted" and event["kind"] == "output" and event["source"] == "claude_code"
+        assert event["findings"][0]["rule_id"] == "SEC_OPENAI_KEY" and KEY not in json.dumps(event)

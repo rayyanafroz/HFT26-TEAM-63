@@ -557,7 +557,10 @@ def cli(argv: list[str]) -> int:
     if args.command == "redact-stream":
         text = sys.stdin.buffer.read().decode("utf-8", errors="replace")
         try:
-            out = friendly_redact(text, analyze(text, settings).findings)
+            found = analyze(text, settings).findings
+            out = friendly_redact(text, found)
+            if found:                                          # for the Guard screen: what was kept from the model
+                remember(load_config(), event_for(Path.cwd().name[:40] or "project", "output", "redacted", found))
         except Exception:  # noqa: BLE001 - never pass unchecked output through as if it were checked
             out = "[Shadow Lens could not check this output, so it was withheld.]\n"
         sys.stdout.write(out)
