@@ -1,0 +1,7 @@
+/* Placeholders that Shadow Lens can turn back into real values on this device. */
+::highlight(shadowlens-restorable) {
+  background-color: rgba(11, 122, 117, 0.2);
+  color: inherit;
+  text-decoration: underline dotted rgba(11, 122, 117, 0.9);
+  text-decoration-thickness: 2px;
+}

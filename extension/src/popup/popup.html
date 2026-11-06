@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Shadow Lens</title>
+  <link rel="stylesheet" href="../pages/pages.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><img src="../icons/icon-48.png" alt=""><b>Shadow Lens</b></div>
+    <span class="status" id="status"><span class="dot"></span><span></span></span>
+  </header>
+
+  <section class="card site" id="site" hidden>
+    <div class="label">This site</div>
+    <div class="site-row">
+      <b id="site-name"></b>
+      <div class="seg" role="group" aria-label="Protection on this site">
+        <button type="button" data-mode="protect">Protect</button>
+        <button type="button" data-mode="warn">Warn only</button>
+        <button type="button" data-mode="off">Off</button>
+      </div>
+    </div>
+    <p class="muted small" id="site-help"></p>
+  </section>
+
+  <section class="card site" id="elsewhere" hidden>
+    <p class="muted">Shadow Lens checks what you paste, send and upload on these AI sites:</p>
+    <p id="site-list"></p>
+  </section>
+
+  <section class="numbers">
+    <div><b id="n-stopped">0</b><span class="label">Stopped today</span></div>
+    <div><b id="n-redacted">0</b><span class="label">Redacted</span></div>
+    <div><b id="n-anyway">0</b><span class="label">Sent anyway</span></div>
+  </section>
+
+  <section class="recent">
+    <div class="label">Recent</div>
+    <ul id="recent"></ul>
+  </section>
+
+  <footer>
+    <span id="companion" class="muted small"></span>
+    <a href="#" id="open-options">Settings &amp; history</a>
+  </footer>
+  <footer class="build">
+    <span class="muted small" id="build"></span>
+  </footer>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

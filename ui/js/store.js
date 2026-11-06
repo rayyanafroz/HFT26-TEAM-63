@@ -18,6 +18,8 @@ export const TOPICS = {
   evidence: "/api/evidence",
   visibility: "/api/visibility",
   sources: "/api/sources",          // not in the base contract yet: Home monitoring list
+  guardSummary: "/api/guard/summary",
+  guardEvents: "/api/guard/events?limit=25",
 };
 
 const state = new Map();       // topic -> { status: "idle"|"loading"|"ready"|"error", data, error, updatedAt }

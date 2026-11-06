@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shadow Lens: stop pasting secrets into AI</title>
+  <meta name="description" content="Shadow Lens checks every prompt, paste and upload on your device before it reaches ChatGPT, Claude, Gemini or your coding agent. API keys, passwords and personal data are caught, redacted, and restored locally. Nothing leaves your machine.">
+  <meta property="og:title" content="Shadow Lens: stop pasting secrets into AI">
+  <meta property="og:description" content="A browser extension and coding-agent hooks that stop API keys, passwords and personal data before they reach an AI. Runs on your device.">
+  <meta name="theme-color" content="#0E151B">
+  <link rel="icon" type="image/png" href="assets/icon-48.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="top">
+    <div class="wrap nav__row">
+      <a class="brand" href="#top" aria-label="Shadow Lens, home"><img src="assets/icon-48.png" alt="" width="28" height="28"><span>Shadow Lens</span></a>
+      <nav aria-label="Sections">
+        <a href="#demo">Try it</a>
+        <a href="#guards">What it guards</a>
+        <a href="#how">How it works</a>
+        <a href="#trust">Trust</a>
+        <a href="#install">Install</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ================= hero + live demo ================= -->
+    <section class="hero">
+      <div class="wrap hero__grid">
+       <div class="hero__copy">
+        <p class="eyebrow">Open source · runs on your device</p>
+        <h1>Stop pasting secrets<br>into AI.</h1>
+        <p class="lede">Shadow Lens checks every prompt, paste and upload <em>before</em> it reaches ChatGPT, Claude, Gemini or your coding agent. Keys, passwords and personal data are caught, swapped for placeholders, and put back locally when the answer comes.</p>
+        <div class="cta">
+          <a class="btn btn--primary" href="#install">Install the extension</a>
+          <a class="btn btn--ghost" href="#demo">Try the real engine below</a>
+        </div>
+       </div>
+       <figure class="swap" aria-label="Before and after: a key in a message becomes a placeholder">
+         <div class="swap__card swap__card--before"><span class="label">You wrote</span><code>OPENAI_API_KEY=<mark>sk-proj-9fK2mQ7x…</mark></code></div>
+         <div class="swap__arrow" aria-hidden="true"><span></span><b>Shadow Lens</b></div>
+         <div class="swap__card swap__card--after"><span class="label">The AI receives</span><code>OPENAI_API_KEY=<span class="ph">[OPENAI_API_KEY_1]</span></code></div>
+         <figcaption>The real value stays in a vault in your browser tab, in memory. When the answer mentions the placeholder, it is restored for you, locally.</figcaption>
+       </figure>
+      </div>
+      <div class="wrap">
+        <ul class="facts" aria-label="Key facts">
+          <li><b>0</b><span>requests to any<br>server</span></li>
+          <li><b>25</b><span>detection rules<br>+ hidden-text checks</span></li>
+          <li><b>&lt; 5 ms</b><span>to check a typical<br>prompt</span></li>
+          <li><b>7</b><span>AI chat sites<br>+ Claude Code</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="demo" id="demo" aria-labelledby="demo-title">
+      <div class="wrap">
+        <div class="demo__head">
+          <h2 id="demo-title">This is the real engine, running in your tab.</h2>
+          <p>The same Rust detection engine the extension ships, compiled to WebAssembly. Type or paste anything, or pick an example. <strong>Nothing you enter leaves this page.</strong></p>
+        </div>
+
+        <div class="demo__grid">
+          <div class="pane">
+            <div class="pane__head">
+              <span class="label">What you type</span>
+              <div class="presets" role="group" aria-label="Examples">
+                <button type="button" data-preset="prompt">API key in a prompt</button>
+                <button type="button" data-preset="env">.env file</button>
+                <button type="button" data-preset="pii">Customer data</button>
+                <button type="button" data-preset="disguised">Disguised key</button>
+                <button type="button" data-preset="hidden">Hidden instruction</button>
+                <button type="button" data-preset="clean">Clean prompt</button>
+              </div>
+            </div>
+            <div class="editor">
+              <div class="editor__marks" aria-hidden="true"></div>
+              <textarea id="input" spellcheck="false" autocomplete="off" aria-label="Text to check" rows="12"></textarea>
+            </div>
+          </div>
+
+          <div class="pane pane--out">
+            <div class="pane__head">
+              <span class="label">What the AI would receive</span>
+              <span class="verdict" id="verdict" role="status" aria-live="polite">Loading the engine…</span>
+            </div>
+            <pre id="output" class="output" aria-label="Redacted text"></pre>
+            <div class="reply" id="reply" hidden>
+              <div class="reply__row">
+                <span class="label">The AI's answer</span>
+                <label class="switch"><input type="checkbox" id="restore"><span></span>Restore real values, on this device only</label>
+              </div>
+              <p id="reply-text" class="reply__text"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="findings" id="findings-wrap" hidden>
+          <h3 class="label">What was found</h3>
+          <ul id="findings"></ul>
+          <p class="demo__foot">Only masks like <code>sk-p... (len 48)</code> are ever kept. The value itself is never stored, logged or shown in the history.</p>
+        </div>
+        <p class="demo__error" id="demo-error" hidden></p>
+      </div>
+    </section>
+
+    <!-- ================= where it guards ================= -->
+    <section class="section" id="guards" aria-labelledby="guards-title">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--dark">Where it works</p>
+        <h2 id="guards-title">One engine, wherever you hand text to an AI.</h2>
+        <div class="cards">
+          <article class="card">
+            <h3>In the browser</h3>
+            <p>ChatGPT, Claude, Gemini, Copilot, Perplexity, DeepSeek and Le Chat. It checks what you type, paste, upload or drop, and holds the message until it knows it is safe.</p>
+            <ul class="ticks"><li>Enter, the send button and form submits are all covered</li><li>Redact &amp; send in one click, or review first</li><li>Replies that mention a placeholder can be copied with the real value</li></ul>
+          </article>
+          <article class="card">
+            <h3>In your coding agent</h3>
+            <p>Hooks for Claude Code check the prompt, the tool call, and what the tool printed. It uses the same rules as the dashboard's agent view.</p>
+            <ul class="ticks"><li>A prompt with a key is blocked, with a safe version to send instead</li><li>Reading <code>.env</code>, <code>~/.ssh</code> or any file that holds a key asks first</li><li><code>grep</code>, <code>cat</code> and <code>git diff</code> output reaches the model redacted</li><li>Dangerous shell commands are denied</li></ul>
+          </article>
+          <article class="card">
+            <h3>In files and screenshots</h3>
+            <p>Text files, code, PDF, Word, Excel and PowerPoint are read on your device. Screenshots and photos are read with on-device OCR.</p>
+            <ul class="ticks"><li>A screenshot of a <code>.env</code> is caught before it goes up</li><li>Offer a redacted text copy instead of the original</li><li>Anything it cannot read is said out loud, not skipped</li></ul>
+          </article>
+          <article class="card">
+            <h3>In the shell and in git</h3>
+            <p>The same check from the command line, so secrets stop at the commit too.</p>
+            <pre class="code"><code>python -m shadowlens.hook scan config.py
+git diff --cached | python -m shadowlens.hook scan
+python -m shadowlens.hook precommit</code></pre>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= how it works ================= -->
+    <section class="section section--tint" id="how" aria-labelledby="how-title">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--dark">How it works</p>
+        <h2 id="how-title">It sits between you and the send button.</h2>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 960 352" role="img" aria-labelledby="diagram-title diagram-desc">
+            <title id="diagram-title">How Shadow Lens handles a message</title>
+            <desc id="diagram-desc">Text you type, paste or upload goes to the Shadow Lens engine on your device. It decides to pass, redact or block. Redacted text goes to the AI site. Real values stay in a memory-only vault on your device and are restored into the AI's answer locally.</desc>
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="d-arrow"/></marker>
+            </defs>
+            <rect x="12" y="20" width="768" height="296" rx="10" class="d-device"/>
+            <text x="30" y="46" class="d-small">ON YOUR DEVICE</text>
+            <g class="d-box"><rect x="36" y="78" width="170" height="92" rx="8"/><text x="121" y="116" class="d-title" text-anchor="middle">You</text><text x="121" y="138" class="d-sub" text-anchor="middle">type · paste · upload</text></g>
+            <g class="d-box d-box--accent"><rect x="290" y="62" width="230" height="124" rx="8"/><text x="405" y="102" class="d-title" text-anchor="middle">Shadow Lens</text><text x="405" y="126" class="d-sub" text-anchor="middle">Rust engine, as WebAssembly</text><text x="405" y="148" class="d-sub" text-anchor="middle">25 rules · checksums · decoders</text></g>
+            <g class="d-box"><rect x="604" y="78" width="130" height="92" rx="8"/><text x="669" y="116" class="d-title" text-anchor="middle">Decision</text><text x="669" y="138" class="d-sub" text-anchor="middle">pass · redact · block</text></g>
+            <g class="d-box d-box--vault"><rect x="290" y="226" width="230" height="64" rx="8"/><text x="405" y="256" class="d-title" text-anchor="middle">Vault</text><text x="405" y="276" class="d-sub" text-anchor="middle">[KEY_1] ⇄ real value · memory only</text></g>
+            <g class="d-box d-box--out"><rect x="812" y="86" width="132" height="76" rx="8"/><text x="878" y="118" class="d-title" text-anchor="middle">AI site</text><text x="878" y="140" class="d-sub" text-anchor="middle">sees [KEY_1] only</text></g>
+            <path d="M206 124H286" class="d-line" marker-end="url(#arrow)"/>
+            <path d="M520 124H600" class="d-line" marker-end="url(#arrow)"/>
+            <path d="M734 124H808" class="d-line" marker-end="url(#arrow)"/>
+            <path d="M405 186V222" class="d-line d-line--dash" marker-end="url(#arrow)"/>
+            <path d="M878 162V258H524" class="d-line d-line--dash" marker-end="url(#arrow)"/>
+            <text x="655" y="246" class="d-small" text-anchor="middle">answer returns</text><text x="655" y="282" class="d-small" text-anchor="middle">restored locally</text><text x="878" y="190" class="d-small" text-anchor="middle">OFF YOUR DEVICE</text>
+          </svg>
+        </figure>
+
+        <ol class="steps">
+          <li><h3>Check, quietly, as you type</h3><p>The composer is checked in the background, so a clean message is sent with no delay at all.</p></li>
+          <li><h3>Hold what is risky</h3><p>Enter, the send button, a paste or an upload is held until the check finishes. A panel shows what was found as masks, never the value.</p></li>
+          <li><h3>Swap, don't lose the context</h3><p>Redact &amp; send replaces values with stable placeholders like <code>[OPENAI_API_KEY_1]</code>. The AI can still help with the shape of your problem.</p></li>
+          <li><h3>Put the real value back, locally</h3><p>When the answer mentions a placeholder, it is highlighted and can be copied with the real value. The value never enters the page.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ================= what it catches ================= -->
+    <section class="section" aria-labelledby="catches-title">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--dark">What it catches</p>
+        <h2 id="catches-title">Built to survive people (and attackers) who try to hide things.</h2>
+        <div class="two">
+          <div>
+            <ul class="chips" aria-label="What is detected">
+              <li>OpenAI, Anthropic, AWS, GitHub, Slack, Stripe, Google, Hugging Face keys</li><li>Private keys</li><li>Database URLs</li><li>JWTs</li><li>Passwords next to their names</li><li>Random-looking tokens</li><li>Cards (Luhn)</li><li>Aadhaar (Verhoeff)</li><li>IBAN (mod-97)</li><li>SSN</li><li>PAN</li><li>Emails and phones</li><li>Internal hosts and private IPs</li><li>Confidential code markers</li><li>Hidden Unicode characters</li><li>Instructions aimed at the AI</li>
+            </ul>
+            <p class="small">Cards, Aadhaar and IBANs are checked against their checksums, so random digits do not raise false alarms. Pick <em>Disguised key</em> above and watch it find a base64-encoded key.</p>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <caption class="sr">Ways of hiding a secret that the engine still finds</caption>
+              <thead><tr><th scope="col">Disguise</th><th scope="col">Found</th></tr></thead>
+              <tbody>
+                <tr><td>Zero-width and soft-hyphen characters inside the key</td><td>✓</td></tr>
+                <tr><td>Full-width and look-alike (Cyrillic) letters</td><td>✓</td></tr>
+                <tr><td>URL, <code>\u</code> and HTML-entity escapes</td><td>✓</td></tr>
+                <tr><td>base64 or hex encoding</td><td>✓</td></tr>
+                <tr><td>Split across spaces, lines or <code>"a" + "b"</code></td><td>✓</td></tr>
+                <tr><td>Hidden "tag" characters spelling instructions</td><td>✓</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= trust ================= -->
+    <section class="section section--night" id="trust" aria-labelledby="trust-title">
+      <div class="wrap">
+        <p class="eyebrow">Trust</p>
+        <h2 id="trust-title">A privacy tool that asks for as little as possible.</h2>
+        <div class="cards cards--night">
+          <article class="card"><h3>No network</h3><p>The detection engine is a WebAssembly module inside the extension. It makes no requests. The only other place events can go is the optional dashboard on your own computer, over Chrome's Native Messaging.</p></article>
+          <article class="card"><h3>Small permissions</h3><p>It runs only on the seven AI chat sites. It does not ask for access to every website, your history or your tabs.</p></article>
+          <article class="card"><h3>Masks, never values</h3><p>History and the dashboard keep a site, a time, what happened, and masks like <code>sk-p... (len 48)</code> with keyed fingerprints. The text is never stored.</p></article>
+          <article class="card"><h3>A vault that forgets</h3><p>Real values behind placeholders live in memory for one tab. Close the tab and they are gone. They are never written to disk.</p></article>
+          <article class="card"><h3>Out of the page's reach</h3><p>The panel lives in a closed shadow root. The site's own scripts cannot read it, click it or switch the guard off.</p></article>
+          <article class="card"><h3>Held to a reference</h3><p>The Rust engine is checked against the Python reference by a conformance suite, a fuzzer that compared 70,000 random texts, and a benchmark with hostile inputs.</p></article>
+        </div>
+
+        <div class="limits">
+          <h3>Honest limits</h3>
+          <ul>
+            <li>It protects people who want to be protected. It cannot stop someone who turns it off, or an AI app it is not installed in (for example a phone app).</li>
+            <li>Detection is not a guarantee. A key written in a form nobody anticipated can slip through; that is what the allowlist, the fuzzer and bug reports are for.</li>
+            <li>Screenshots are read with OCR, which can misread characters. It is best effort and it says so.</li>
+            <li>Prompt-injection checks are heuristics: they flag the common tricks, not every possible one.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= for developers ================= -->
+    <section class="section" aria-labelledby="dev-title">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--dark">For developers</p>
+        <h2 id="dev-title">How it is built, and how it is kept honest.</h2>
+        <div class="two">
+          <div>
+            <ul class="ticks ticks--roomy">
+              <li><b>Rust, as WebAssembly.</b> A function-by-function port of the Python engine, with Python's regex semantics reproduced (<code>\w</code>, <code>\b</code>, ignore-case, even CPython's base64 and JSON behaviour).</li>
+              <li><b>Generated, not copied.</b> Patterns and Unicode tables are generated from the Python reference; a test fails if they drift.</li>
+              <li><b>Conformance suite.</b> 277 cases that any implementation must match exactly: findings, spans, masks, fingerprints, redacted text.</li>
+              <li><b>Differential fuzzing.</b> Random texts built from fake secrets, disguises and awkward Unicode, compared byte for byte.</li>
+              <li><b>Fast on hostile input.</b> Quadratic regexes were replaced with hand-written matchers; 64 KB of dots or a 200 KB base64 run takes milliseconds.</li>
+              <li><b>Tested in real Chromium</b> against mock chats built on ProseMirror, Quill and plain textareas.</li>
+            </ul>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <caption class="sr">Time to check hostile inputs, Rust against the Python reference</caption>
+              <thead><tr><th scope="col">Input</th><th scope="col">Rust</th><th scope="col">Python</th></tr></thead>
+              <tbody>
+                <tr><td>64 KB of <code>a.a.a.</code></td><td>8 ms</td><td>61 ms</td></tr>
+                <tr><td>200 KB base64 run</td><td>17 ms</td><td>165 ms</td></tr>
+                <tr><td>200 KB of prose</td><td>19 ms</td><td>179 ms</td></tr>
+                <tr><td>2,500 API keys in one text</td><td>62 ms</td><td>1,002 ms</td></tr>
+                <tr><td>1,500 IBAN-looking keys</td><td>20 ms</td><td>662 ms</td></tr>
+              </tbody>
+            </table>
+            <p class="small">Native build, on the development machine. The WebAssembly build the extension ships is slower (roughly 1.3 to 5 times on these inputs); a typical prompt still takes a few milliseconds once warm.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= install ================= -->
+    <section class="section section--tint" id="install" aria-labelledby="install-title">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--dark">Install</p>
+        <h2 id="install-title">From source, in about five minutes.</h2>
+        <div class="install">
+          <article class="step">
+            <span class="step__n">1</span>
+            <h3>The browser extension</h3>
+            <p>Needs Node 20+ and Rust (for the engine).</p>
+            <div class="cmd"><pre><code>cd extension
+npm install
+node tools/build-engine.mjs
+node tools/build.mjs</code></pre><button type="button" class="copy" data-copy="cd extension&#10;npm install&#10;node tools/build-engine.mjs&#10;node tools/build.mjs">Copy</button></div>
+            <p class="small">Open <code>chrome://extensions</code>, turn on Developer mode, choose <b>Load unpacked</b> and pick <code>extension/dist</code>.</p>
+          </article>
+          <article class="step">
+            <span class="step__n">2</span>
+            <h3>The dashboard (optional)</h3>
+            <p>See what was stopped, across the browser and your coding agent.</p>
+            <div class="cmd"><pre><code>python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m shadowlens
+.venv/bin/python -m shadowlens.native_host install</code></pre><button type="button" class="copy" data-copy="python -m venv .venv&#10;.venv/bin/pip install -r requirements.txt&#10;.venv/bin/python -m shadowlens&#10;.venv/bin/python -m shadowlens.native_host install">Copy</button></div>
+            <p class="small">Restart the browser after the last command. The extension's popup then links to the dashboard's <b>Guard</b> screen.</p>
+          </article>
+          <article class="step">
+            <span class="step__n">3</span>
+            <h3>Claude Code hooks</h3>
+            <p>Stops secrets before the model sees them.</p>
+            <div class="cmd"><pre><code>.venv/bin/python -m shadowlens.hook install
+# then, in Claude Code, try a prompt with a fake key</code></pre><button type="button" class="copy" data-copy=".venv/bin/python -m shadowlens.hook install">Copy</button></div>
+            <p class="small">Uses <code>~/.claude/settings.json</code> (or <code>--scope project</code>) and keeps any hooks you already have. <code>uninstall</code> removes only its own.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= faq ================= -->
+    <section class="section" aria-labelledby="faq-title">
+      <div class="wrap wrap--narrow">
+        <p class="eyebrow eyebrow--dark">Questions</p>
+        <h2 id="faq-title">What developers ask first.</h2>
+        <div class="faq">
+          <details><summary>Does anything I type leave my machine?</summary><p>No. The check runs in a WebAssembly module inside the extension, which makes no network requests. You can verify that in the extension's network panel, and the demo above is the same engine running on this page.</p></details>
+          <details><summary>Will it break the chat?</summary><p>It avoids that on purpose: clean messages are never delayed (the composer is checked as you type), and when it does step in it sends or pastes for you the way you would. Chat sites change often; each one has its own adapter, and the end-to-end tests run against editors built like theirs.</p></details>
+          <details><summary>What about false positives?</summary><p>Pick <b>Not a secret</b> in the panel and that exact value (as a keyed fingerprint, never the text) is not flagged again. Low-risk findings like an email address only add a quiet badge.</p></details>
+          <details><summary>How is this different from enterprise AI-DLP tools?</summary><p>Those watch a whole company from the network and report back to an admin. Shadow Lens is for one person at the point of typing: it stops the mistake before it happens, keeps everything local, and costs nothing to run. It is a developer tool and a learning project, not a compliance product.</p></details>
+          <details><summary>Does it work with Cursor, Copilot or other IDE tools?</summary><p>Claude Code is supported through its hooks. The scan command and the git pre-commit check work anywhere. Editors that expose a prompt hook can reuse the same engine; that is the next thing to add.</p></details>
+          <details><summary>Is it audited?</summary><p>No. It is open source (MIT) and heavily tested, and every claim on this page maps to a test or a benchmark you can run. Read it before you trust it.</p></details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__row">
+      <div class="brand"><img src="assets/icon-48.png" alt="" width="24" height="24"><span>Shadow Lens</span></div>
+      <p>MIT licensed. Detection is a safety net, not a guarantee.</p>
+      <a href="#top">Back to top ↑</a>
+    </div>
+  </footer>
+
+  <script type="module" src="demo.js"></script>
+</body>
+</html>

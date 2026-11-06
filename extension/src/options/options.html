@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shadow Lens settings</title>
+  <link rel="stylesheet" href="../pages/pages.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><img src="../icons/icon-48.png" alt=""><b>Shadow Lens</b></div>
+    <nav aria-label="Sections">
+      <a href="#protection">Protection</a><a href="#try">Try it</a><a href="#allowed">Not secrets</a><a href="#terms">Company terms</a><a href="#history">History</a><a href="#privacy">Privacy</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="protection" class="card">
+      <div class="head">
+        <h2>Protection</h2>
+        <label class="switch"><input type="checkbox" id="enabled"><span></span><b>On everywhere</b></label>
+      </div>
+      <h3 class="label">Sites</h3>
+      <table id="sites"><thead><tr><th>Site</th><th>Mode</th></tr></thead><tbody></tbody></table>
+      <p class="muted small">Protect: stop and ask, by the rules below. Warn only: show what was found, never block. Off: do nothing there.</p>
+
+      <h3 class="label">What happens</h3>
+      <table id="actions"><thead><tr><th>When the worst finding is</th><th>Then</th></tr></thead><tbody></tbody></table>
+      <p class="muted small">Note: a quiet badge only. Warn: stop and ask; sending anyway is one click. Block: stop; sending anyway is allowed only as set below.</p>
+
+      <div class="toggles">
+        <label class="switch"><input type="checkbox" id="allowOverride"><span></span>Allow &ldquo;Send anyway&rdquo; for blocked messages</label>
+        <label class="switch"><input type="checkbox" id="requireReason"><span></span>Ask for a short reason when sending anyway (kept in your history)</label>
+        <label class="switch"><input type="checkbox" id="scanPaste"><span></span>Check what I paste</label>
+        <label class="switch"><input type="checkbox" id="scanFiles"><span></span>Check files I upload or drop (text, code, PDF, Word, Excel, PowerPoint)</label>
+        <label class="switch"><input type="checkbox" id="hiddenText"><span></span>Warn about hidden characters and instructions aimed at the AI</label>
+        <label class="switch"><input type="checkbox" id="companion"><span></span>Also send events to the Shadow Lens dashboard on this computer</label>
+      </div>
+      <p class="muted small" id="companion-status"></p>
+    </section>
+
+    <section id="try" class="card">
+      <h2>Try it</h2>
+      <p class="muted">Type or paste anything. It is checked on this device and not kept.</p>
+      <textarea id="try-text" rows="5" spellcheck="false" placeholder="e.g. OPENAI_API_KEY=sk-proj-... or a card number"></textarea>
+      <div id="try-result" aria-live="polite"></div>
+    </section>
+
+    <section id="allowed" class="card">
+      <h2>Not secrets</h2>
+      <p class="muted">Values you marked &ldquo;Not a secret&rdquo;. Only a keyed fingerprint is kept, never the value.</p>
+      <table><thead><tr><th>What</th><th>Looks like</th><th>Added</th><th></th></tr></thead><tbody id="allowlist"></tbody></table>
+    </section>
+
+    <section id="terms" class="card">
+      <h2>Company terms</h2>
+      <label class="field"><span class="label">Internal markers</span>
+        <span class="muted small">When set, code is only flagged if it mentions one of these (one per line), e.g. ACME-INTERNAL.</span>
+        <textarea id="internal_markers" rows="3"></textarea></label>
+      <label class="field"><span class="label">Email domains to ignore</span>
+        <span class="muted small">Addresses at these domains are not personal data (one per line).</span>
+        <textarea id="email_skip_domains" rows="3"></textarea></label>
+      <button class="btn primary" type="button" id="save-terms">Save</button> <span class="muted small" id="terms-saved"></span>
+    </section>
+
+    <section id="history" class="card">
+      <div class="head">
+        <h2>History</h2>
+        <div><button class="btn" type="button" id="export">Export JSON</button> <button class="btn danger" type="button" id="clear">Clear</button></div>
+      </div>
+      <p class="muted">What the guard did. Values appear only as masks such as <span class="mono">sk-p&hellip; (len 56)</span>.</p>
+      <table><thead><tr><th>When</th><th>Site</th><th>What happened</th><th>Found</th></tr></thead><tbody id="events"></tbody></table>
+    </section>
+
+    <section id="privacy" class="card">
+      <h2>What stays on this device</h2>
+      <ul class="plain">
+        <li>Everything is checked here, by a detection engine built into the extension. Nothing is sent to any server.</li>
+        <li>Real values replaced by placeholders are kept in memory for the tab you are in, so the AI&rsquo;s answers can be turned back. They are gone when you close the tab.</li>
+        <li>The history keeps the site, the time, what happened and masks of what was found. Never the text.</li>
+        <li>If the Shadow Lens dashboard is installed on this computer, the same history entries go to it, and nowhere else.</li>
+      </ul>
+      <p class="muted small" id="build"></p>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

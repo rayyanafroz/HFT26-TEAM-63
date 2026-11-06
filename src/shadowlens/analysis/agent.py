@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 from typing import Any, Iterator
 
 from shadowlens.analysis.masking import hash12
-from shadowlens.analysis.normalize import deobfuscate_command
+from shadowlens.analysis.normalize import deobfuscate_command  # noqa: F401 - used below
+from shadowlens.analysis.pathmatch import _HOME_PREFIX_RE, matches_any, matches_any_view, normalize_path  # noqa: F401
 from shadowlens.analysis.settings import AgentRules, AnalysisSettings
 from shadowlens.core.ctx import AgentSessionContext
 from shadowlens.models import CapabilityName, Severity
@@ -37,9 +38,6 @@ _COMMAND_SPLIT_RE = re.compile(r"&&|\|\||;|\||\n")
 _WRITES_OR_SUBSTITUTES_RE = re.compile(r">|\$\(|`")
 _FIND_ACTIONS_RE = re.compile(r"\s-(?:exec|execdir|delete|ok)\b")
 
-_HOME_PREFIX_RE = re.compile(
-    r"^(?:/home/[^/]+|/users/[^/]+|[a-z]:/users/[^/]+|%userprofile%|\$env:userprofile|\$home|~)(?:/|$)"
-)
 _DRIVE_RE = re.compile(r"^[a-z]:(?:/|$)")
 
 
@@ -279,15 +277,6 @@ def is_read_only(commands: list[str], rules: AgentRules) -> bool:
     return True
 
 
-def normalize_path(path: str) -> str:
-    """One lowercase form for Windows and POSIX path strings; every home folder becomes ``~/``."""
-    text = path.strip().strip("\"'").replace("\\", "/").lower()
-    match = _HOME_PREFIX_RE.match(text)
-    if match:
-        return "~/" + text[match.end():]
-    return text
-
-
 def is_outside_workspace(path: str, roots: tuple[str, ...]) -> bool:
     normalized = normalize_path(path)
     if ".." in normalized.split("/"):
@@ -299,18 +288,6 @@ def is_outside_workspace(path: str, roots: tuple[str, ...]) -> bool:
         if normalized == base or normalized.startswith(base + "/"):
             return False
     return True
-
-
-def matches_any(patterns: tuple[re.Pattern[str], ...], text: str) -> bool:
-    return any(pattern.search(text) for pattern in patterns)
-
-
-def matches_any_view(patterns: tuple[re.Pattern[str], ...], text: str) -> bool:
-    """``matches_any`` on the command as written and as the shell will read it (``r''m``, ``\\rm``, ``${IFS}``)."""
-    if matches_any(patterns, text):
-        return True
-    plain = deobfuscate_command(text)
-    return plain != text and matches_any(patterns, plain)
 
 
 # ---- rules --------------------------------------------------------------------

@@ -1,0 +1,20 @@
+body { padding: 0 0 48px; }
+.top { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 14px max(16px, calc((100vw - 880px) / 2)); background: var(--paper); border-bottom: 1px solid var(--line); }
+nav { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; }
+nav a { text-decoration: none; color: var(--slate); }
+nav a:hover { color: var(--teal); }
+main { max-width: 880px; margin: 24px auto 0; padding: 0 16px; display: grid; gap: 16px; }
+.card { display: grid; gap: 12px; padding: 20px 22px; scroll-margin-top: 80px; }
+h2 { font-size: 20px; line-height: 28px; font-weight: 700; }
+h3.label { margin-top: 4px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.small { font-size: 12px; line-height: 16px; }
+.toggles { display: grid; gap: 10px; margin-top: 4px; }
+.field { display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+#try-result ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+#try-result li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+#try-result .out { margin-top: 10px; white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono); font-size: 12px; background: var(--mist); padding: 10px 12px; }
+td .mono { word-break: break-all; }
+@media (max-width: 640px) { th:nth-child(2), td:nth-child(2) { display: none; } }

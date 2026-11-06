@@ -21,7 +21,7 @@ QUEUE_SIZE = 1000
 # The message types the dashboard understands.
 EVENT_TYPES = frozenset({
     "event.new", "finding.new", "alert.new", "score.update",
-    "remediation.update", "scenario.progress", "reset",
+    "remediation.update", "scenario.progress", "reset", "guard.new",
 })
 
 _CLOSED = object()           # put in every queue to end the streams on shutdown

@@ -1,16 +1,88 @@
 # Shadow Lens
 
-### Find the shadow AI. Prove what leaked. Govern the agents.
+### Stop pasting secrets into AI. See what leaked. Govern the agents.
 
-Shadow Lens is a local, passive desktop app. It finds which AI tools are running on a machine (cloud AI, local models such as Ollama, browser AI tools and autonomous coding agents), reads the text it can legitimately see to prove what sensitive data was sent to them, shows what each agent was allowed to do compared with what it actually did, and scores the risk on a dashboard that never leaves the machine. It reports; it never blocks. It needs no SSL decryption and nothing installed on other machines, and it says plainly what it cannot see.
+Shadow Lens keeps API keys, passwords and personal data out of AI tools, and shows you what got near them. It has two halves that share one detection engine:
+
+- **The guard (prevention).** A browser extension checks every prompt, paste and upload on ChatGPT, Claude, Gemini and four other AI sites *before* it is sent, and Claude Code hooks do the same for prompts and tool calls. Values are blocked or swapped for placeholders, and put back locally when the answer comes. Everything runs on your device.
+- **The dashboard (visibility).** A local desktop app finds which AI tools run on a machine, proves what sensitive data was sent to them, shows what each agent was allowed to do compared with what it did, scores the risk, and shows what the guard stopped.
+
+![Shadow Lens overview](docs/screenshots/overview.png)
+
+## What is in this repository
+
+| Folder | What it is |
+| :-- | :-- |
+| [`extension/`](extension) | The browser extension (Manifest V3): the guard for AI chats. Popup, settings, history, OCR for screenshots, PDF and Office readers |
+| [`engine/`](engine) | The detection engine in Rust: a library, a conformance adapter, and the WebAssembly build the extension ships |
+| [`src/shadowlens/`](src/shadowlens) | The Python reference engine, the dashboard's API and database, the Native Messaging host, and the Claude Code hooks (`hook.py`) |
+| [`conformance/`](conformance) | The suite, differential fuzzer and benchmark that hold the Rust engine to the Python reference |
+| [`ui/`](ui) | The dashboard (plain HTML, CSS and JavaScript), including the Guard screen |
+| [`site/`](site) | The landing page, with a live demo running the real engine in the browser |
+
+## Quick start
+
+**The browser extension** (needs Node 20+ and Rust with the `wasm32-unknown-unknown` target):
+
+```bash
+cd extension && npm install
+node tools/build-engine.mjs && node tools/build.mjs
+```
+
+Then open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick `extension/dist`. Use fake values to try it: a made-up key such as `sk-proj-` followed by 43 random letters and digits.
+
+**The dashboard and the link to the browser:**
+
+```bash
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m shadowlens                         # http://127.0.0.1:8787, Guard screen at #/guard
+.venv/bin/python -m shadowlens.native_host install     # then restart the browser
+```
+
+**Claude Code hooks:**
+
+```bash
+.venv/bin/python -m shadowlens.hook install            # user-wide; add --scope project for one project
+.venv/bin/python -m shadowlens.hook scan some_file.py  # the same check from the shell
+.venv/bin/python -m shadowlens.hook precommit          # what is staged in git
+```
+
+**The landing page:** `node site/build.mjs --serve` and open http://localhost:8000. To host it (Railway, Render, Fly, any Node host): `node site/build.mjs --out ../shadow-lens-site`, then deploy that folder; it holds only public files and a dependency-free `server.mjs` that `npm start` runs on `$PORT`.
+
+## How the guard works
+
+- **Typing** is checked in the background, so a clean message is sent with no delay. A message with something in it is held; a panel shows what was found as masks, and offers *Redact & send*, *Edit*, or *Send anyway* (with a reason, if the setting asks for one).
+- **Placeholders.** Redacting replaces a value with a stable placeholder such as `[OPENAI_API_KEY_1]`. The real value stays in a per-tab vault in memory (never on disk). When the answer mentions the placeholder, in prose or a code block, it is highlighted and can be copied with the real value; the value never enters the page.
+- **Files and screenshots.** Text, code, PDF, Word, Excel, PowerPoint and images (read with on-device OCR) are checked before they are uploaded; a redacted text copy is offered.
+- **Hidden text.** Invisible Unicode, direction overrides and instructions aimed at the AI (prompt injection) are flagged on paste.
+- **Claude Code.** `UserPromptSubmit` blocks a prompt that holds a secret and shows a safe version (`[OPENAI_API_KEY_1]`). `PreToolUse` denies a tool call carrying a secret or a dangerous command; asks before reading a credential file *or any file that holds a secret* (it looks first); and routes the output of read-only shell commands (`grep`, `cat`, `env`, `git diff`...) through the redactor, so the model sees placeholders, not values. `PostToolUse` tells the model not to repeat secrets that reached it some other way. Decisions are recorded for the Guard screen as masks only. Tested against the real Claude Code CLI.
+
+What it keeps: a site, a time, what happened, and masks such as `sk-p... (len 48)` with keyed fingerprints. Never the text.
+
+## Verification
+
+```bash
+.venv/bin/python -m pytest -q                      # Python: the reference engine, API, hooks, native host
+(cd extension && npm test && npm run test:e2e)     # extension: unit tests and real-Chromium tests
+node site/build.mjs && node --test site/test.mjs   # landing page
+cd engine && cargo test                            # Rust engine
+.venv/bin/python -m conformance.check --cmd "engine/target/release/engine-adapter --settings conformance/build/settings.json"
+.venv/bin/python -m conformance.fuzz --cmd "..." --n 10000        # random texts against the reference
+```
+
+## Limits of the guard
+
+It protects people who want to be protected: it cannot stop someone who turns it off, or an AI app it is not installed in. Detection is a safety net, not a guarantee. Screenshots are read with OCR, which can misread characters. Prompt-injection checks are heuristics. Claude Code hooks cannot rewrite a prompt, only block it, so the safe version is shown for you to send. The extension is tested against mock chat apps built on the same editors as the real sites, and was driven on the live, logged-out ChatGPT in Brave (stop, redact & send, the real answer's placeholder copied back, paste); the other sites need a login and have not been driven live. The Claude Code hooks cannot change what a built-in tool other than a shell command prints, so output of `Grep` or `Read` on a file that was allowed is not redacted.
 
 ![Shadow Lens overview](docs/screenshots/overview.png)
 
 ## Contents
 
-[The problem](#the-problem) · [Solution overview](#solution-overview) · [Approach](#approach) · [Architecture](#architecture) · [Key screenshots](#key-screenshots) · [What it detects](#what-it-detects) · [Scoring and compliance](#scoring-and-compliance) · [Tech stack](#tech-stack) · [Local setup and installation](#local-setup-and-installation) · [Trying it out](#trying-it-out) · [Configuration](#configuration) · [Testing and evidence](#testing-and-evidence) · [Privacy and limits](#privacy-and-limits) · [Repository layout](#repository-layout) · [Attribution](#attribution)
+[What is in this repository](#what-is-in-this-repository) · [Quick start](#quick-start) · [How the guard works](#how-the-guard-works) · [Verification](#verification) · [Limits of the guard](#limits-of-the-guard) · [The problem](#the-problem) · [Solution overview](#solution-overview) · [Approach](#approach) · [Architecture](#architecture) · [Key screenshots](#key-screenshots) · [What it detects](#what-it-detects) · [Scoring and compliance](#scoring-and-compliance) · [Tech stack](#tech-stack) · [Local setup and installation](#local-setup-and-installation) · [Trying it out](#trying-it-out) · [Configuration](#configuration) · [Testing and evidence](#testing-and-evidence) · [Privacy and limits](#privacy-and-limits) · [Repository layout](#repository-layout) · [Attribution](#attribution)
 
-## The problem
+## The dashboard
+
+### The problem
 
 Employees and developers now use cloud AI, local models, browser AI tools and coding agents with no security oversight. They paste keys, customer data and source code into prompts, and agents get a shell and file access. Nobody can see it, because it happens across processes, ports, apps and encrypted requests, and today's guardrails only sit inside a single chat box.
 
@@ -195,6 +267,7 @@ src/shadowlens/
   api/         app, routes_*, sse, local_only
   eval/        run (writes data/evidence.json)
 config/        providers, agent_rules, rules, sources, compliance
+conformance/   the detection engine's cross-language test suite (build, adapter, check)
 scenarios/     templates/*.jsonl, demo, mock_ollama, agent_sim, transcript_sim
 fixtures/      labeled test data and samples
 ui/            the dashboard (plain HTML, CSS, JavaScript)
@@ -212,5 +285,10 @@ docs/          DETECTORS, DEMO, INVENTORY, screenshots/
 | pytest | MIT |
 | Hanken Grotesk, IBM Plex Mono (self-hosted fonts) | SIL Open Font License 1.1 |
 | GSAP and ScrollTrigger (dashboard motion) | GSAP Standard "No Charge" license |
+| fancy-regex, regex, serde, serde_json, hmac, sha2 (the Rust engine) | MIT or Apache-2.0 |
+| Tesseract.js and its English model (screenshot OCR in the extension) | Apache-2.0 |
+| pdf.js (PDF text in the extension) | Apache-2.0 |
+| fflate (Office files in the extension) | MIT |
+| esbuild (build), Playwright (end-to-end tests), ProseMirror and Quill (editors in the mock chat apps) | MIT, Apache-2.0, MIT, BSD |
 
 The project itself is under the MIT license (see [LICENSE](LICENSE)). All demo secrets are generated at run time from `src/shadowlens/fakes.py`; the repository holds no real or token-shaped secret.

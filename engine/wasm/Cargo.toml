@@ -1,0 +1,13 @@
+[package]
+name = "shadowlens-engine-wasm"
+description = "The Shadow Lens engine as a WebAssembly module with a small C-style interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde_json = "1.0.154"
+shadowlens-engine = { path = "../core" }

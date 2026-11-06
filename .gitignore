@@ -23,3 +23,20 @@ wheelhouse/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Generated conformance suite (built from fakes at run time, never committed)
+conformance/build/
+
+# Rust build output
+engine/target/
+
+# Extension build output and dependencies
+extension/node_modules/
+extension/dist/
+extension/dist-test/
+extension/src/engine/shadowlens_engine.wasm
+
+# Landing page build output
+site/dist/
+
+extension/samples/

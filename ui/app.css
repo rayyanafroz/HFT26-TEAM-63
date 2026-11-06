@@ -877,3 +877,26 @@ input.input { color: var(--ink); }
 .table.prov .toggle__input:checked + .toggle__track { background: var(--sev-green); border-color: var(--sev-green); }
 .table.prov .toggle__input:checked ~ .toggle__text { color: var(--sev-green); }
 .table.prov .toggle__input:not(:checked) ~ .toggle__text { color: var(--sev-amber); }
+
+/* ---------- Guard (what the browser extension stopped) ---------- */
+.guard { display: grid; gap: 19px; }
+.guard-top { display: grid; grid-template-columns: repeat(4, 1fr) 1.6fr; gap: 19px; }
+.guard-top > * { min-width: 0; min-height: 150px; }
+.guard-mid { display: grid; grid-template-columns: 1.4fr 1fr 1.2fr; gap: 19px; }
+.guard-mid > * { min-width: 0; min-height: 220px; }
+.guard-conn p + p { margin-top: 6px; }
+.guard-conn code { font-size: 12px; background: var(--white); padding: 1px 4px; }
+.guard-cols { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; align-items: end; height: 120px; }
+.guard-col { display: flex; flex-direction: column-reverse; height: 100%; justify-content: flex-start; background: var(--mist); }
+.guard-col__stopped { background: var(--teal); display: block; }
+.guard-col__through { background: var(--sev-red); display: block; }
+.guard-legend { display: flex; gap: 16px; margin-top: 10px; }
+.guard-key { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+.guard-key--stopped { background: var(--teal); } .guard-key--through { background: var(--sev-red); }
+.guard-find { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.guard-table td { vertical-align: top; }
+@media (max-width: 1100px) {
+  .guard-top { grid-template-columns: repeat(2, 1fr); }
+  .guard-top > .guard-conn { grid-column: 1 / -1; }
+  .guard-mid { grid-template-columns: 1fr; }
+}

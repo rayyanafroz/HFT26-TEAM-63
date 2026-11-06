@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from shadowlens.core.rule_titles import title_for
-from shadowlens.models import category_for_rule
 
 # Overlap priority, lower wins.
 _NAMED_SECRET, _DB_URL, _CHECKSUM_PII, _GENERIC, _OTHER_PII, _ENTROPY = range(6)
@@ -94,6 +93,8 @@ class TextFinding:
 
     @property
     def category(self) -> str:
+        from shadowlens.models import category_for_rule  # noqa: PLC0415 - pydantic is slow to import; the hooks never need it
+
         return category_for_rule(self.rule_id).value
 
     @property
